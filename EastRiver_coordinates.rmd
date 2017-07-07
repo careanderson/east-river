@@ -1,0 +1,44 @@
+---
+title: "East River Coordinates""
+author: "CGA"
+date: "June 9, 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(ggmap)
+library(ggrepel)
+setwd("~/East_River/") #set the working directory
+```
+
+## 1. Read in raw GPS data
+```{r}
+gps <- read.csv("8June2017_EastRiverGPS.csv") #input your datafile
+gps.sub <- subset(gps, select = -c(Date.Created, Description, Northing, Easting)) #removing some columns
+gps.sub <- gps.sub[-c(6, 8, 10), ] #getting relevant sampling locations
+colnames(gps.sub) <- c("name","lat","lon")
+```
+
+## 2. Load and generate ggmap
+```{r}
+# Making a map of the points
+mapeastriver <- get_map(location = c(lon = mean(gps.sub$lon), lat = mean(gps.sub$lat)),
+                        zoom = 17, maptype = "satellite", scale=2)
+
+p <- ggmap(mapeastriver) + geom_point(data = gps.sub, aes(x=lon, y=lat), color="red")
+#p <- p + geom_label_repel(data = gps.sub, aes(lon, lat, label=name), color="black", size=4)
+p <- p +  geom_label_repel(
+  data = gps.sub, aes(lon, lat, label = name),
+  fontface = 'bold', color = 'black',
+  box.padding = unit(0.35, "lines"),
+  point.padding = unit(0.5, "lines"),
+  segment.color = 'white')
+
+print(p)
+```
