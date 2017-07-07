@@ -1,0 +1,131 @@
+---
+title: "East River Soil Processing"
+author: "CGA"
+date: "June 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+setwd("~/East_River/") #set the working directory
+```
+
+## 1. Read in raw soils data
+```{r}
+soil <- read_excel("Data/June2017_EastRiver_datasheet.xlsx", skip=1) #input your datafile
+soil <- soil[-c(1:39),] #removing the hillslope soils
+
+# Make key for sample ID and sample location/depth
+soil.key <- soil[,c(1:3)]
+soil.key <- soil.key[!duplicated(soil.key), ]
+
+# Print key
+#write.csv(soil.key, "22June2017_EastRiver_samplekey.csv")
+
+# Subset just the anaerobic and regular aerobic air dry data
+soil.airdry <- soil[,c(1:8, 13)]
+soil.airdry <- soil.airdry[!duplicated(soil.airdry$ID), ]
+
+# Subset just the oven dry data for gravimetric water content
+soil.ovendry <- soil[,c(1:3, 9:12)]
+```
+
+## 2. Process oven dry data for gravimetric water content
+```{r}
+# Split the sample name into location (MC1-3) and rep (b1-3)
+soil.ovendry <- soil.ovendry %>%
+  separate(sample, c("location", "rep"), sep="-")
+
+# Split the depth into top/bottom
+soil.ovendry <- soil.ovendry %>%
+  separate(depth_cm, c("top", "bottom"), sep="-")
+
+# Make "top" and "bottom" columns numeric
+soil.ovendry[,c("top","bottom")] <- apply(soil.ovendry[,c("top","bottom")], 2,
+                                          function(x) as.numeric(as.character(x)))
+
+# Take the mean of top/bottom depths (change to weighted mean?)
+soil.ovendry$mean.depth_cm <- rowMeans(subset(soil.ovendry, select = c(top, bottom)), na.rm = TRUE)
+
+# Column for gravimetric water content (confirm)
+soil.ovendry$gwc <- 
+  (soil.ovendry$moist_soil_g_oven - (soil.ovendry$dry_tin_g - soil.ovendry$tin_g)) /
+  (soil.ovendry$dry_tin_g - soil.ovendry$tin_g)
+
+ggplot(soil.ovendry, aes(x=gwc, y=mean.depth_cm)) +
+  geom_point() +
+  geom_smooth() +
+  scale_y_reverse() +
+  facet_wrap(~location)
+```
+
+## 2. Process for sieved soil (<2mm), rocks (>2mm), and roots
+```{r}
+# Read in the processed data
+soil.sieved <- read_excel("Data/June2017_EastRiver_RootsRocks.xlsx")
+  
+# Bag averages to subtract
+z <- mean(c("")) #ziploc gallon bag
+u <- mean(c(11.22, 11.28, 11.28, 11.25)) #up & up gallon bag
+q <- mean(c(4.84, 4.81, 4.84, 4.83)) #ziploc quart bag
+
+# Recode the bag variables to their actual weights
+soil.sieved2 <- apply(soil.sieved, 2, function(x) {x <- recode(x,"z=11.2575; u=11.2575; q=4.83"); x})
+
+#data <- apply(data, 2, function(x) {x <- recode(x,"1=777; 0=888"); x})
+
+# Soil/rock fractions
+soil.sieved$soil_frac <- soil.sieved$soil2mm_g / (soil.sieved$soil2mm_g + soil.sieved$rocks_g)
+soil.sieved$rock_frac <- soil.sieved$rocks_g / (soil.sieved$soil2mm_g + soil.sieved$rocks_g)
+  
+# Root biomass 
+soil.sieved$roots_per <- soil.sieved$roots_g / (soil.sieved$soil2mm_g)
+
+# Split the sample name into location (MC1-3) and rep (b1-3)
+soil.sieved <- soil.sieved %>%
+  separate(sample, c("location", "rep"), sep="-")
+
+# Split the depth into top/bottom
+soil.sieved <- soil.sieved %>%
+  separate(depth_cm, c("top", "bottom"), sep="-")
+
+# Make "top" and "bottom" columns numeric
+soil.sieved[,c("top","bottom")] <- apply(soil.sieved[,c("top","bottom")], 2,
+                                          function(x) as.numeric(as.character(x)))
+# Take the mean of top/bottom depths (change to weighted mean?)
+soil.sieved$mean.depth_cm <- rowMeans(subset(soil.sieved, select = c(top, bottom)), na.rm = TRUE)
+
+# Figure: roots
+ggplot(soil.sieved, aes(x=(roots_g), y=mean.depth_cm, color=location)) +
+  geom_point() +
+#  geom_smooth() +
+  scale_y_reverse() +
+  xlab("Root biomass (g)") +
+  ylab("Depth (cm)")
+
+ggplot(soil.sieved, aes(x=log(roots_g), y=mean.depth_cm, color=location)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  scale_y_reverse() +
+  xlab("Log(Root biomass (g))") +
+  ylab("Depth (cm)")
+
+ggplot(soil.sieved, aes(x=roots_per, y=mean.depth_cm, color=location)) +
+  geom_point() +
+#  geom_smooth(method="lm") +
+  scale_y_reverse() +
+  xlab("Root biomass as fraction of <2mm soil fraction") +
+  ylab("Depth (cm)")
+
+# Figure: fraction <2mm (by air dry weight)
+ggplot(soil.sieved, aes(x=soil_frac, y=mean.depth_cm, color=location)) +
+  geom_point() +
+#  geom_smooth() +
+  scale_y_reverse() +
+  xlab("Fraction <2mm (by air dry weight)") +
+  ylab("Depth (cm)")
+```
