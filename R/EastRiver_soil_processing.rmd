@@ -11,7 +11,7 @@ library(readxl)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-setwd("~/East_River/") #set the working directory
+setwd("~/east-river/") #set the working directory
 ```
 
 ## 1. Read in raw soils data
@@ -63,27 +63,35 @@ ggplot(soil.ovendry, aes(x=gwc, y=mean.depth_cm)) +
   facet_wrap(~location)
 ```
 
-## 2. Process for sieved soil (<2mm), rocks (>2mm), and roots
+## 3. Process for sieved soil (<2mm), rocks (>2mm), and roots
 ```{r}
 # Read in the processed data
 soil.sieved <- read_excel("Data/June2017_EastRiver_RootsRocks.xlsx")
-  
+soil.sieved$soil_BAG <- as.factor(soil.sieved$soil_BAG)
+soil.sieved$rocks_BAG <- as.factor(soil.sieved$rocks_BAG)
+
 # Bag averages to subtract
 z <- mean(c("")) #ziploc gallon bag
 u <- mean(c(11.22, 11.28, 11.28, 11.25)) #up & up gallon bag
 q <- mean(c(4.84, 4.81, 4.84, 4.83)) #ziploc quart bag
 
 # Recode the bag variables to their actual weights
-soil.sieved2 <- apply(soil.sieved, 2, function(x) {x <- recode(x,"z=11.2575; u=11.2575; q=4.83"); x})
+soil.sieved$soil_BAG <- as.numeric(as.character(recode_factor(soil.sieved$soil_BAG, `z` = "11.2575", `u` = "11.2575", `q` = "4.83")))
+soil.sieved$rocks_BAG <- as.numeric(as.character(recode_factor(soil.sieved$rocks_BAG, `z` = "11.2575", `u` = "11.2575", `q` = "4.83", `na` = "0", `none` = "0")))
 
-#data <- apply(data, 2, function(x) {x <- recode(x,"1=777; 0=888"); x})
+# Subtract the bag weights
+soil.sieved$soil2mm_g_final <- soil.sieved$soil2mm_g - soil.sieved$soil_BAG
+soil.sieved$rocks_g_final <- soil.sieved$rocks_g - soil.sieved$rocks_BAG
 
 # Soil/rock fractions
-soil.sieved$soil_frac <- soil.sieved$soil2mm_g / (soil.sieved$soil2mm_g + soil.sieved$rocks_g)
-soil.sieved$rock_frac <- soil.sieved$rocks_g / (soil.sieved$soil2mm_g + soil.sieved$rocks_g)
+soil.sieved$soil_frac <- soil.sieved$soil2mm_g_final / 
+  (soil.sieved$soil2mm_g_final + soil.sieved$rocks_g_final + soil.sieved$roots_g)
+soil.sieved$rock_frac <- soil.sieved$rocks_g / 
+  (soil.sieved$soil2mm_g + soil.sieved$rocks_g + soil.sieved$roots_g)
   
 # Root biomass 
-soil.sieved$roots_per <- soil.sieved$roots_g / (soil.sieved$soil2mm_g)
+soil.sieved$roots_per <- soil.sieved$roots_g / 
+  (soil.sieved$soil2mm_g_final)
 
 # Split the sample name into location (MC1-3) and rep (b1-3)
 soil.sieved <- soil.sieved %>%
@@ -98,8 +106,12 @@ soil.sieved[,c("top","bottom")] <- apply(soil.sieved[,c("top","bottom")], 2,
                                           function(x) as.numeric(as.character(x)))
 # Take the mean of top/bottom depths (change to weighted mean?)
 soil.sieved$mean.depth_cm <- rowMeans(subset(soil.sieved, select = c(top, bottom)), na.rm = TRUE)
+```
 
-# Figure: roots
+## 4. Figures of 2mm fraction, root biomass
+```{r}
+# Root figures
+# Root biomass (not standardized)
 ggplot(soil.sieved, aes(x=(roots_g), y=mean.depth_cm, color=location)) +
   geom_point() +
 #  geom_smooth() +
@@ -114,6 +126,7 @@ ggplot(soil.sieved, aes(x=log(roots_g), y=mean.depth_cm, color=location)) +
   xlab("Log(Root biomass (g))") +
   ylab("Depth (cm)")
 
+# Root biomass (g roots g-1 soil)
 ggplot(soil.sieved, aes(x=roots_per, y=mean.depth_cm, color=location)) +
   geom_point() +
 #  geom_smooth(method="lm") +
@@ -121,7 +134,14 @@ ggplot(soil.sieved, aes(x=roots_per, y=mean.depth_cm, color=location)) +
   xlab("Root biomass as fraction of <2mm soil fraction") +
   ylab("Depth (cm)")
 
-# Figure: fraction <2mm (by air dry weight)
+ggplot(soil.sieved, aes(x=log(roots_per), y=mean.depth_cm, color=location)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  scale_y_reverse() +
+  xlab("Root biomass as fraction of <2mm soil fraction") +
+  ylab("Depth (cm)")
+
+# Fraction <2mm (by air dry weight)
 ggplot(soil.sieved, aes(x=soil_frac, y=mean.depth_cm, color=location)) +
   geom_point() +
 #  geom_smooth() +
