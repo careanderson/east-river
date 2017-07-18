@@ -14,12 +14,12 @@ library(ggplot2)
 library(dplyr)
 library(ggmap)
 library(ggrepel)
-setwd("~/East_River/") #set the working directory
+setwd("~/east-river/") #set the working directory
 ```
 
 ## 1. Read in raw GPS data
 ```{r}
-gps <- read.csv("8June2017_EastRiverGPS.csv") #input your datafile
+gps <- read.csv("Data/8June2017_EastRiverGPS.csv") #input your datafile
 gps.sub <- subset(gps, select = -c(Date.Created, Description, Northing, Easting)) #removing some columns
 gps.sub <- gps.sub[-c(6, 8, 10), ] #getting relevant sampling locations
 colnames(gps.sub) <- c("name","lat","lon")

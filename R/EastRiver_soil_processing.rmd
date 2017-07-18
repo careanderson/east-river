@@ -115,7 +115,7 @@ soil.sieved.print <- soil.sieved[,c("ID","location","rep","top","bottom","mean.d
 
 soil.sieved.print <- soil.sieved.print[with(soil.sieved.print, order(location,rep,top)),]
 
-write.csv(soil.sieved.print, "June2017_EastRiver_soil_processed.csv")
+#write.csv(soil.sieved.print, "June2017_EastRiver_soil_processed.csv")
 ```
 
 ## 4. Figures of 2mm fraction, root biomass
