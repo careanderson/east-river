@@ -7,10 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(readxl)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
+library(tidyverse)
 setwd("~/east-river/") #set the working directory
 ```
 

@@ -9,9 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(readxl)
-library(ggplot2)
-library(dplyr)
+library(tidyverse)
 library(ggmap)
 library(ggrepel)
 setwd("~/east-river/") #set the working directory
