@@ -39,4 +39,24 @@ p <- p +  geom_label_repel(
   segment.color = 'white')
 
 print(p)
+
+
+# Print empty map of site
+p1 <- ggmap(mapeastriver)
+print(p1)
+
+# Print only sampled transect
+gps.sub2 <- gps.sub[c(1,5,6), ]
+gps.sub2$name2 <- str_sub(gps.sub2$name, 1, str_length(gps.sub2$name)-3)
+  
+p2 <- ggmap(mapeastriver) + geom_point(data = gps.sub2, aes(x=lon, y=lat), color="red")
+p2 <- p2 +  geom_label_repel(
+  data = gps.sub2, aes(lon, lat, label = name2),
+  fontface = 'bold', color = 'black',
+  box.padding = unit(0.35, "lines"),
+  point.padding = unit(0.5, "lines"),
+  segment.color = 'white')
+
+print(p2)
+
 ```
