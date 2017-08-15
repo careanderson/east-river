@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggmap)
 library(ggrepel)
+library(stringr)
 setwd("~/east-river/") #set the working directory
 ```
 
@@ -48,15 +49,37 @@ print(p1)
 # Print only sampled transect
 gps.sub2 <- gps.sub[c(1,5,6), ]
 gps.sub2$name2 <- str_sub(gps.sub2$name, 1, str_length(gps.sub2$name)-3)
-  
-p2 <- ggmap(mapeastriver) + geom_point(data = gps.sub2, aes(x=lon, y=lat), color="red")
-p2 <- p2 +  geom_label_repel(
-  data = gps.sub2, aes(lon, lat, label = name2),
-  fontface = 'bold', color = 'black',
-  box.padding = unit(0.35, "lines"),
-  point.padding = unit(0.5, "lines"),
-  segment.color = 'white')
+
+mapeastriver2 <- get_map(location = c(lon = mean(gps.sub2$lon), lat = mean(gps.sub2$lat)),
+                        zoom = 18, maptype = "satellite", scale=2)
+
+p2 <- ggmap(mapeastriver2) +
+  geom_line(data = gps.sub2, aes(x=lon, y=lat), color="yellow", size=1) +
+  geom_point(data = gps.sub2, aes(x=lon, y=lat), color="yellow", size=2)
+#p2 <- p2 +  geom_label_repel(
+#  data = gps.sub2, aes(lon, lat, label = name2),
+#  fontface = 'bold', color = 'black',
+#  box.padding = unit(0.35, "lines"),
+#  point.padding = unit(0.5, "lines"),
+#  segment.color = 'white')
 
 print(p2)
+```
 
+##. 3. For zoomed figure of field site
+```{r}
+# Colorado map
+colorado <- get_map('colorado', zoom = 6, maptype = "satellite", source = "google")
+
+ggmap(colorado) +
+  geom_path(data=map_data("state"), aes(x=long, y=lat), color="white", size=2) +
+  coord_map(xlim=c(-110, -101), ylim=c(36, 41.5))
+
+# RMBL map
+lat <- c(38.886, 39)                
+lon <- c(-107.056967, -106.870604)
+
+get_googlemap(center = c(lon = mean(lon), lat = mean(lat)),
+                        zoom = 12, maptype = "terrain") %>%
+  ggmap()
 ```
