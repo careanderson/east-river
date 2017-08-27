@@ -80,6 +80,30 @@ lat <- c(38.886, 39)
 lon <- c(-107.056967, -106.870604)
 
 get_googlemap(center = c(lon = mean(lon), lat = mean(lat)),
-                        zoom = 12, maptype = "terrain") %>%
-  ggmap()
+              zoom = 12, maptype = "terrain") %>%
+  ggmap() 
+
+# Coordinates for Mt. Crested Butte and RMBL
+location <- c("Mt. Crested Butte", "RMBL")
+latitude <- c(38.9122, 38.9585)
+longitude <- c(-106.9624, -106.9878)
+
+gps.map <- data.frame(location, latitude, longitude)
+
+# RMBL map without terrain labels, with labels for Mt. Crested Butte and RMBL
+#https://stackoverflow.com/questions/36367335/ggmap-removing-country-names-from-googles-terrain-map
+#https://developers.google.com/maps/documentation/static-maps/styling#features
+get_googlemap(center = c(lon = mean(lon), lat = mean(lat)),
+              zoom = 12, maptype = "terrain",
+              style = c('feature:landscape|element:labels|visibility:off',
+                        'feature:administrative|element:labels|visibility:off',
+                        'feature:poi|element:labels|visibility:off')) %>%
+  ggmap() + 
+  geom_point(data = gps.map, aes(x=longitude, y=latitude), color="red", size=4) +
+  geom_label_repel(data = gps.map, aes(longitude, latitude, label = location),
+                   fontface = 'bold', color = 'black',
+                   box.padding = unit(0.5, "lines"),
+                   point.padding = unit(0.5, "lines"),
+                   segment.color = 'red',
+                   segment.size = 2)
 ```
