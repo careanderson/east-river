@@ -1,0 +1,80 @@
+---
+title: "density-frac"
+author: "CGA"
+date: "October 12, 2017"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load density fraction weights
+```{r}
+dens.frac <- read_excel("Data/Sept2017_EastRiver_densityfrac.xlsx")
+
+# Light fraction
+dens.frac$light_frac_g <- dens.frac$frac1_g - (dens.frac$frac1_boat_g + dens.frac$frac1_filter_g)
+
+# Intermediate fraction
+dens.frac$frac2_soil_g <- dens.frac$frac2_g - (dens.frac$frac2_boat_g + dens.frac$frac2_filter_g)
+dens.frac$frac3_soil_g <- dens.frac$frac3_g - (dens.frac$frac3_boat_g + dens.frac$frac3_filter_g)
+dens.frac$frac4_soil_g <- dens.frac$frac4_g - (dens.frac$frac4_boat_g + dens.frac$frac4_filter_g)
+dens.frac$frac5_soil_g <- dens.frac$frac5_g - (dens.frac$frac5_boat_g + dens.frac$frac5_filter_g)
+
+dens.frac$int_frac_g <- rowSums(dens.frac[, c("frac2_soil_g","frac3_soil_g","frac4_soil_g","frac5_soil_g")], na.rm=TRUE)
+
+# Heavy fraction
+dens.frac$heavy_frac_g <- dens.frac$frac_heavy_soilandtube_g - dens.frac$frac_heavy_tube_g
+
+# Trim dataset to only relevant columns
+dens.frac.short <- dens.frac[,c("ID","soil_mass_g","light_frac_g","int_frac_g","heavy_frac_g")]
+
+# Checking recovery values
+#dens.frac.short$sum <- rowSums(dens.frac.short[, c(3:5)])
+#dens.frac.short$dif <- (dens.frac.short$soil_mass_g - dens.frac.short$sum)
+```
+
+## Match with sample IDs
+```{r}
+sample_id <- read_csv("Data/June2017_EastRiver_soil_processed.csv")[, c(1:5)] # Loading the first 5 columns
+
+# Merge dens.frac with sample id
+dens.frac.merge <- left_join(dens.frac.short, sample_id, by="ID")
+
+# need special case for samples 28, 65, 49
+# Sample 28 = sample 28 + sample 45
+# Sample 65 = sample 65 + sample 14
+# sample 49 = sample 49 + sample 30
+special <- filter(sample_id, ID %in% c("45", "14", "30"))
+# sample 28+ goes to 78cm
+# sample 65+ goes to 75cm
+# sample 49+ goes to 68cm
+
+dens.frac.merge$bottom[dens.frac.merge$ID==28] <- 78
+dens.frac.merge$bottom[dens.frac.merge$ID==65] <- 75
+dens.frac.merge$bottom[dens.frac.merge$ID==49] <- 68
+
+# Recalc mean depths; Take the mean of top/bottom depths (change to weighted mean?)
+dens.frac.merge$mean.depth_cm <- rowMeans(subset(dens.frac.merge, select = c(top, bottom)), na.rm = TRUE)
+
+# Calculate percentage of each fraction of total soil weight
+dens.frac.merge$light_frac_per <- dens.frac.merge$light_frac_g / dens.frac.merge$soil_mass_g
+dens.frac.merge$int_frac_per <- dens.frac.merge$int_frac_g / dens.frac.merge$soil_mass_g
+dens.frac.merge$heavy_frac_per <- dens.frac.merge$heavy_frac_g / dens.frac.merge$soil_mass_g
+
+```
+
+## Figures
+```{r}
+# Bar chart of different fractions, across sampling points and with depth
+ggplot(dens.frac.merge, aes(x=mean.depth_cm, y=int_frac_per)) +
+  geom_point()
+```
