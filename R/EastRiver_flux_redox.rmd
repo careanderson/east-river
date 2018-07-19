@@ -1,0 +1,232 @@
+---
+title: "EastRiver_flux_redox"
+author: "CGA"
+date: "June 17, 2018"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(gridExtra)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load and tidy all data
+```{r}
+### Reading in all data
+#https://stackoverflow.com/questions/47511319/read-all-worksheets-as-dataframes-from-multiple-excel-workbooks-of-different-s
+
+read_excel_allsheets <- function(filename) {
+    sheets <- readxl::excel_sheets(filename)
+    x <-    lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    names(x) <- sheets
+    x
+}
+
+mysheets <- read_excel_allsheets('Data/2018_fielddata/18July2018_MCT2 Instrumentation and Sampling.xlsx')
+
+rhizon_key <- as.data.frame(mysheets[1])
+solid_key <- as.data.frame(mysheets[2])
+well_data <- as.data.frame(mysheets[3])
+licor_key <- as.data.frame(mysheets[4])
+flux <- as.data.frame(mysheets[5])
+redox_key <- as.data.frame(mysheets[6])
+redox <- as.data.frame(mysheets[7])
+
+# Column names
+names(rhizon_key) <- gsub(pattern = "Rhizon.Probe.Key.", replacement = "", x = names(rhizon_key))
+names(solid_key) <- gsub(pattern = "Solid.Sampling.Key.", replacement = "", x = names(solid_key))
+names(well_data) <- gsub(pattern = "Well.Sampling.Data.", replacement = "", x = names(well_data))
+names(licor_key) <- gsub(pattern = "LI.COR.Key.", replacement = "", x = names(licor_key))
+names(flux) <- gsub(pattern = "LI.COR.Data.", replacement = "", x = names(flux))
+names(redox_key) <- gsub(pattern = "Redox.Key.", replacement = "", x = names(redox_key))
+names(redox) <- gsub(pattern = "Redox.Data.", replacement = "", x = names(redox))
+
+```
+
+## Flux data, initial figures
+```{r}
+# Change flux column names
+colnames(flux)[c(4,5)] <- c("collar", "temp_C")
+
+# as.numeric
+flux$Moisture <- as.numeric(flux$Moisture)
+flux$CO2.Rep.1 <- as.numeric(flux$CO2.Rep.1)
+flux$CO2.Rep.2 <- as.numeric(flux$CO2.Rep.2)
+flux$CO2.Rep.3 <- as.numeric(flux$CO2.Rep.3)
+
+flux$Location <- as.factor(flux$Location)
+
+# Make datetime column
+flux$Date <- format(flux$Date, format = "%m/%d/%Y")
+flux$Time <- format(flux$Time, format = "%H:%M")
+flux$datetime <- -999
+flux$datetime <- as.POSIXct(paste(flux$Date, flux$Time), format="%m/%d/%Y %H:%M")
+
+# Flux average (To do: exclude outliers based on SD)
+flux$flux.av <- rowMeans(flux[, c(7,8,9)], na.rm = TRUE)
+
+# Initial figures
+ggplot(flux) +
+  aes(x=datetime, y=flux.av) +
+  geom_point() +
+  facet_wrap(~Location)
+
+ggplot(flux) +
+  aes(x=Moisture, y=flux.av, color=Location) +
+  geom_point()
+
+ggplot(flux) +
+  aes(x=temp_C, y=flux.av, color=Location) +
+  geom_point()
+
+# Merge flux with licor key
+colnames(licor_key)[2] <- "collar"
+flux_total <- merge(flux, licor_key)
+
+# MCT2-1 for presentation
+ggplot(subset(flux_total, Location == "MCT2-1")) +
+  aes(x=datetime, y=flux.av) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+ggplot(flux_total) +
+  aes(x=temp_C, y=flux.av, color=Environment) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  xlab("Soil temperature (C)") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Vegetation type"))
+
+ggplot(flux_total) +
+  aes(x=Moisture, y=flux.av, color=Environment) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Soil moisture (volumetric)") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Vegetation type"))
+
+ggplot(subset(flux_total)) +
+  aes(x=datetime, y=flux.av, color=Moisture) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+#  guides(color=guide_legend(title="Vegetation type")) +
+  facet_wrap(~Location)
+
+```
+
+
+## Redox data and key, initial figures
+```{r}
+redox$Probe[redox$Probe == "8b"] <- 8
+           
+# Make datetime column
+redox$Date <- format(redox$Date, format = "%m/%d/%Y")
+redox$Date[redox$Date == "05/29/2018"] <- ("05/30/2018") #Change 5/29 to 5/30 to match with licor
+redox$Time <- format(redox$Time, format = "%H:%M")
+redox$datetime <- -999
+redox$datetime <- as.POSIXct(paste(redox$Date, redox$Time), format="%m/%d/%Y %H:%M")
+
+# Merge with redox key
+colnames(redox_key)[4] <- "depth_cm"
+redox_total <- merge(redox, redox_key)
+
+# Redox average
+redox_total$Uncorrected.1..mV. <- as.numeric(redox_total$Uncorrected.1..mV.)
+redox_total$Uncorrected.2..mV. <- as.numeric(redox_total$Uncorrected.2..mV.)
+redox_total$redox_av <- rowMeans(redox_total[, c(5,6)], na.rm = TRUE)
+
+# Corrected redox values (add 254)
+redox_total$redox_av.corrected <- redox_total$redox_av + 254
+
+# Initial figures
+ggplot(redox_total) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("Redox, corrected (mV)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~Location)
+
+# Aggregate depths (average of duplicate/triplicates)
+redox_av.means <- aggregate(redox_av.corrected~Location+datetime+Date+depth_cm, redox_total, mean)
+
+# MCT2-4 for presentation
+ggplot(subset(redox_av.means, Location == "MCT2-4")) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  geom_point() +
+  geom_line() +
+  xlab("Date") + ylab("Redox potential (mV)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Soil depth (cm)"))
+
+```
+
+
+## Flux and redox
+```{r}
+# Merge CO2 flux and redox
+redox_av.means$datetime <- NULL
+redox_av.means$depth_cm <- as.factor(redox_av.means$depth_cm)
+flux_redox <- merge(flux_total, redox_av.means, by=c("Date", "Location"))
+
+ggplot(flux_redox) +
+  aes(x=redox_av.corrected, y=flux.av) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~depth_cm, scales="free")
+
+ggplot(flux_redox) +
+  aes(x=redox_av.corrected, y=flux.av, color=Moisture) +
+  geom_point() +
+#  geom_smooth() +
+  facet_wrap(~depth_cm, scales="free")
+
+ggplot(subset(flux_redox, redox_av.corrected < 0)) +
+  aes(x=redox_av.corrected, y=flux.av, color=Moisture) +
+  geom_point() +
+#  geom_smooth() +
+  facet_wrap(~depth_cm + Location, scales="free")
+
+ggplot(subset(flux_redox, depth_cm == 100)) +
+  aes(x=redox_av.corrected, y=flux.av, color=Moisture) +
+  geom_point() +
+#  geom_smooth() +
+  facet_wrap(~depth_cm + Location, scales="free")
+```

@@ -1,0 +1,172 @@
+---
+title: "EastRiver_Acclima"
+author: "CGA"
+date: "June 4, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(gridExtra)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load and tidy Acclima logger files
+```{r}
+
+mc4 <- read.csv("Data/acclima_raw/DataSnapExport_130720181034_datasnap3_mc4.csv")
+mc3 <- read.csv("Data/acclima_raw/DataSnapExport_130720181105_datasnap1_mc3.csv")
+mc1 <- read.csv("Data/acclima_raw/DataSnapExport_130720181109_datasnap2_mc1.csv")
+
+# change column names
+colnames(mc4) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
+
+colnames(mc3) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
+
+colnames(mc1) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
+
+# make sensor a factor
+mc4$sensor <- as.factor(mc4$sensor)
+mc3$sensor <- as.factor(mc3$sensor)
+mc1$sensor <- as.factor(mc1$sensor)
+
+# time column
+mc4$time <- as.POSIXct(mc4$time, format="%m/%d/%Y %I:%M:%S %p")
+mc3$time <- as.POSIXct(mc3$time, format="%m/%d/%Y %I:%M:%S %p")
+mc1$time <- as.POSIXct(mc1$time, format="%m/%d/%Y %I:%M:%S %p")
+
+# location column
+mc4$location <- "MCT2-4"
+mc3$location <- "MCT2-3"
+mc1$location <- "MCT2-1"
+
+```
+
+
+## Name soil depths, rbind all
+```{r}
+mc4$depth <- -999
+mc4$depth <- ifelse(mc4$sensor %in% c(9000094, 9000101), "surface",
+                    ifelse(mc4$sensor %in% c(9000218, 9000128), "mid_30cm", "deep_70cm"))
+
+mc3$depth <- -999
+mc3$depth <- ifelse(mc3$sensor %in% c(9000013, 9000109), "surface",
+                    ifelse(mc3$sensor %in% c(9000028, 9000230), "mid_30cm", "deep_70cm"))
+
+mc1$depth <- -999
+mc1$depth <- ifelse(mc1$sensor %in% c(9000014, 9000176), "surface",
+                    ifelse(mc1$sensor %in% c(9000170, 9000180), "mid_30cm", "deep_70cm"))
+
+acclima_total <- rbind(mc1, mc3, mc4)
+```
+
+
+## Plots (moisture/temp)
+```{r}
+ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
+  aes(x=time, y=temperature, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~location)
+
+ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
+  aes(x=time, y=moisture, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("moisture") + ggtitle("Soil moisture") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~location)
+
+ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
+  aes(x=time, y=conductivity, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("conductivity") + ggtitle("Soil conductivity") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~location)
+
+
+# MC1
+g1 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
+  aes(x=time, y=temperature, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-1") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+g2 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
+  aes(x=time, y=moisture, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-1") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# MC3
+g3 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
+  aes(x=time, y=temperature, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-3") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+g4 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
+  aes(x=time, y=moisture, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-3") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# MC4
+g5 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
+  aes(x=time, y=temperature, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-4") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+g6 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
+  aes(x=time, y=moisture, color=depth) +
+  geom_point(size = 1) +
+  xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-4") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# multiple plots together
+grid.arrange(g1, g3, g5, nrow = 3)
+grid.arrange(g2, g4, g6, nrow = 3)
+```
