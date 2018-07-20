@@ -23,7 +23,7 @@ setwd("~/east-river/")
 # Discharge
 # https://waterdata.usgs.gov/nwis/uv/?site_no=09112500&PARAmeter_cd=00060,00065
 # Measured in cubic feet per second
-discharge <- read_tsv("Data/10July2018_east_river_almont_discharge.txt", skip=28)
+discharge <- read_tsv("Data/20July2018_east_river_almont_discharge.txt", skip=28)
 discharge <- discharge[-1, ] #remove first row
 
 ```
