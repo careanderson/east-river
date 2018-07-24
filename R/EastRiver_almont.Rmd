@@ -23,13 +23,13 @@ setwd("~/east-river/")
 # Discharge
 # https://waterdata.usgs.gov/nwis/uv/?site_no=09112500&PARAmeter_cd=00060,00065
 # Measured in cubic feet per second
-discharge <- read_tsv("Data/20July2018_east_river_almont_discharge.txt", skip=28)
+discharge <- read_tsv("Data/23July2018_east_river_almont_discharge.txt", skip=28)
 discharge <- discharge[-1, ] #remove first row
 
 ```
 
 
-## Name soil depths
+## Tidy data
 ```{r}
 discharge <- discharge[ , c(3,5,7)] #Only taking date/time, discharge, gage height data
 
@@ -49,7 +49,7 @@ discharge$gageheight_ft <- as.numeric((discharge$gageheight_ft))
 ## Plots
 ```{r}
 # Soil sampling dates
-soil_sampling <- c("2018-05-28 00:00:00", "2018-06-08 00:00:00", "2018-06-18 00:00:00", "2018-06-28 00:00:00")
+soil_sampling <- c("2018-05-28 00:00:00", "2018-06-08 00:00:00", "2018-06-18 00:00:00", "2018-06-28 00:00:00", "2018-07-23 00:00:00")
 soil_sampling <- as.POSIXct(soil_sampling)
 soil_sampling <- data.frame(soil_sampling)
 

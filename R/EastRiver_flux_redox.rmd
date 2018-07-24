@@ -31,7 +31,7 @@ read_excel_allsheets <- function(filename) {
     x
 }
 
-mysheets <- read_excel_allsheets('Data/2018_fielddata/18July2018_MCT2 Instrumentation and Sampling.xlsx')
+mysheets <- read_excel_allsheets('Data/2018_fielddata/23July2018_MCT2 Instrumentation and Sampling.xlsx')
 
 rhizon_key <- as.data.frame(mysheets[1])
 solid_key <- as.data.frame(mysheets[2])
@@ -128,7 +128,7 @@ ggplot(flux_total) +
         panel.grid.minor = element_blank()) +
   guides(color=guide_legend(title="Vegetation type"))
 
-ggplot(subset(flux_total)) +
+ggplot(subset(flux_total, flux.av < 5)) +
   aes(x=datetime, y=flux.av, color=Moisture) +
   geom_point() +
   geom_smooth() +
@@ -140,6 +140,40 @@ ggplot(subset(flux_total)) +
         panel.grid.minor = element_blank()) +
 #  guides(color=guide_legend(title="Vegetation type")) +
   facet_wrap(~Location)
+
+ggplot(subset(flux_total)) +
+  aes(x=as.POSIXct(Time, format= "%H:%M"), y=flux.av, color=as.POSIXct(Time, format= "%H:%M")) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~Location)
+
+# Temperature sensitivity (Q10)
+## Davidson 2012, DAMM
+
+## Abramoff
+# Arrhenius Model (The Arrhenius equation to estimate the rate of a reaction is a null model to the more process-based models DAMM and DAMM-MCNiP);  This model is based on the assumption that temperature is the main effect on the depolymerization rate, and that depolymerization is the rate-limiting process controlling C efflux.
+# FC = α * e-Ea/RT
+# α is the pre-exponential constant (mg C cm-3 hr-1), T is soil temperature (K) at 10 cm depth, Ea is the activation energy (kJ/mol), and R is the universal gas constant (kJ mol-1 K-1).
+# alpha = 5.38 x 10^10 (Davidson)
+# Ea = 72.26 (Davidson)
+# R = 0.00831447 kJ mol-1 K-1
+# T = soil temp
+flux_total$FC <- -999
+flux_total$FC <- (5.38 * 10^10) * exp(72.26/(0.00831447*flux$temp_C))
+
+ggplot(flux_total) +
+  aes(x=FC, y=flux.av) +
+  geom_point()
+
+# Dual Arrhenius and Michaelis-Menten Model: DAMM simulates the effects of soil temperature, soil moisture and substrate supply on soil organic matter (SOM) depolymerization. Depolymerization is affected by soil temperature according to Arrhenius kinetics. Soil water content modifies the supply of two substrates, oxygen and a generalized C-containing substrate, both of which affect depolymerization using a Michaelis-Menten (i.e., dual Monod) kinetic approximation)
+# Calculation for Depolymerization rate, using Vmax from Arrhenius equation
+
 
 ```
 
@@ -178,7 +212,8 @@ ggplot(redox_total) +
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  facet_wrap(~Location)
+  facet_wrap(~Location) +
+  guides(color=guide_legend(title="Soil depth (cm)"))
 
 # Aggregate depths (average of duplicate/triplicates)
 redox_av.means <- aggregate(redox_av.corrected~Location+datetime+Date+depth_cm, redox_total, mean)
