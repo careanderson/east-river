@@ -156,3 +156,16 @@ ggplot(soil.sieved, aes(x=soil_frac, y=mean.depth_cm, color=location)) +
   xlab("Fraction <2mm (by air dry weight)") +
   ylab("Depth (cm)")
 ```
+
+## 5. Soils data for Derek
+```{r}
+soils <- read.csv("Data/June2017_EastRiver_sample_list.csv")
+soils_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
+soils_derek <- merge(soils, soils_key)
+
+soils_match <- soils[c(16:36),]
+soils_derek <- soils_derek[match(soils_match$ID, soils_derek$ID),]
+
+#write.csv(soils_derek, "Data/June2017_EastRiver_sample_list_with_depths.csv")
+
+```
