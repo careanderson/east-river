@@ -1,0 +1,151 @@
+---
+title: "EastRiver_fticrms"
+author: "CGA"
+date: "July 20, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(gridExtra)
+library(lubridate)
+library(reshape2)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load and tidy FT-ICR-MS data
+```{r}
+# Rachelle processed FT-ICR-MS data; see email for her R scripts.
+#It gives you the abundance of peaks that can be assigned to different compound classes (lipids, carbs, …) and a few other metrics (S, N or P containing compounds, molecular weight, etc)
+
+#For the poster, it might be a good starting point to simply average the three replicates and see if the means between the different depths/locations are different.  No stats necessary for now, but some visualization would be great.
+
+icr <- read_excel("Data/CountOutput-Marco Solvent Extration SPE Report May 2018.xlsx", na="NA")
+
+# Remove "NA" rows
+icr <- icr[complete.cases(icr[,1]), ]
+
+# Replace periods with underscores in "sample" column
+icr$sample <- gsub("[.]","_", icr$sample) 
+
+# Separate the "sample" column
+icr <- icr %>%
+  separate(sample, c("ID", "extract", "type"), "_")
+
+# Remove "X" at beginning of ID
+icr$ID <- sub("*X", "", icr$ID)
+
+# Sum of "set #1" (columns lipids to tannins)
+icr$set_1 <- rowSums(icr[, c(22:29)])
+
+# Sum of "set #2" (columns aliphatics to lignin phenol)
+icr$set_2 <- rowSums((icr[, c(31:36)]))
+
+# Normalizing the number of peaks for each compound class (lipids, lignins, carbs, etc.) to the total number of peaks. Note that there are two different sets of compound classes that you should consider separately (called set_1 and set_2)
+
+
+icr$Lipids_norm <- icr$Lipids / icr$set_1
+icr$UnSaturated_Hydrocarbons_norm <- icr$UnSaturated_Hydrocarbons / icr$set_1
+icr$Condensed_Hydrocarbons_norm <- icr$Condensed_Hydrocarbons / icr$set_1
+icr$Proteins_norm <- icr$Proteins / icr$set_1
+icr$Amino_Sugars_norm <- icr$Amino_Sugars / icr$set_1
+icr$Carbohydrates_norm <- icr$Carbohydrates / icr$set_1
+icr$Lignin_norm <- icr$Lignin / icr$set_1
+icr$Tannins_norm <- icr$Tannins / icr$set_1
+  
+icr$Aliphatics_norm <- icr$Aliphatics / icr$set_2
+icr$AliphaticsN_norm <- icr$AliphaticsN / icr$set_2
+icr$Saturated_norm <- icr$Saturated / icr$set_2
+icr$Condensed_Aromatics_norm <- icr$Condensed_Aromatics / icr$set_2
+icr$Aromatic_norm <- icr$Aromatic / icr$set_2
+icr$LigninPhenolics_norm <- icr$LigninPhenolics / icr$set_2
+
+colnames(icr)
+
+icr_norm <- icr[, c(1:21, 40:53)] #Subsetting only normalized values
+
+#Another idea would be to run a PCA or NMDS on the initial “raw” dataset. You could see to what extent the different extractions cluster, and if the different locations/depths cluster together or group separately. See fig. 3 in Graham et al. 
+```
+
+
+## Merge with sample ID key (average triplicates?)
+```{r}
+sample_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
+
+# Separate the "sample" column into two separate columns (location, rep)
+sample_key <- sample_key %>%
+  separate(sample, c("location", "rep"), "-")
+
+# Separate the "depth_cm" column into two separate columns (top_cm, btm_cm)
+sample_key <- sample_key %>%
+  separate(depth_cm, c("top_cm", "btm_cm"), "-")
+
+sample_key$top_cm <- as.numeric(sample_key$top_cm)
+sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
+
+icr_total_norm <- merge(icr_norm, sample_key, all.x=TRUE) #all.x=TRUE to keep blanks
+
+# Average triplicates? (b1, b2, b3)
+soils <- read.csv("Data/June2017_EastRiver_sample_list_with_depths.csv")
+soils <- soils[ , c(1,4,5)]
+colnames(soils)[2] <- "Location"
+# Merge ICR and soils data, then average by location & depth_class
+icr_total_merge <- merge(icr_total_norm, soils)
+
+# Melt the data
+icr_melt <- melt(icr_total_merge, id=c("ID", "extract", "type", "top_cm", "btm_cm", "rep", "location", "Location", "Depth_cm"))
+
+icr_melt$extract <- as.factor(icr_melt$extract)
+icr_melt$location <- as.factor(icr_melt$location)
+
+icr_melt_averages <- icr_melt %>%
+  group_by(Location, Depth_cm, variable) %>%
+  summarize(value.mean= mean(value), value.sd = sd(value))
+
+```
+
+
+## Plots
+```{r}
+ggplot(icr_total) +
+  aes(x=top_cm, y=Condensed_Aromatics, color=location) +
+  geom_point() +
+  facet_wrap(~extract, scales="free")
+
+# Melted data
+
+ggplot(subset(icr_melt, extract %in% "H2O")) +
+  aes(x=top_cm, y=value) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~variable, scales="free") +
+  ggtitle("Water-extractable carbon")
+
+ggplot(subset(icr_melt, extract %in% "PP")) +
+  aes(x=top_cm, y=value) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~variable, scales="free") +
+  ggtitle("Pyrophosphate-extractable carbon")
+
+ggplot(subset(icr_melt, extract %in% "HCl")) +
+  aes(x=top_cm, y=value) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~variable, scales="free") +
+  ggtitle("HCl-extractable carbon")
+
+ggplot(subset(icr_melt, extract %in% "Dith")) +
+  aes(x=top_cm, y=value) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~variable, scales="free") +
+  ggtitle("Dithionite-extractable carbon")
+```
+
