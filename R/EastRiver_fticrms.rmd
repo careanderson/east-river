@@ -15,6 +15,8 @@ library(readxl)
 library(gridExtra)
 library(lubridate)
 library(reshape2)
+library(ggpubr)
+library(vegan)
 # Set working directory
 setwd("~/east-river/")
 ```
@@ -50,27 +52,24 @@ icr$set_2 <- rowSums((icr[, c(31:36)]))
 # Normalizing the number of peaks for each compound class (lipids, lignins, carbs, etc.) to the total number of peaks. Note that there are two different sets of compound classes that you should consider separately (called set_1 and set_2)
 
 
-icr$Lipids_norm <- icr$Lipids / icr$set_1
-icr$UnSaturated_Hydrocarbons_norm <- icr$UnSaturated_Hydrocarbons / icr$set_1
-icr$Condensed_Hydrocarbons_norm <- icr$Condensed_Hydrocarbons / icr$set_1
-icr$Proteins_norm <- icr$Proteins / icr$set_1
-icr$Amino_Sugars_norm <- icr$Amino_Sugars / icr$set_1
-icr$Carbohydrates_norm <- icr$Carbohydrates / icr$set_1
-icr$Lignin_norm <- icr$Lignin / icr$set_1
-icr$Tannins_norm <- icr$Tannins / icr$set_1
+icr$Lipids_norm <- icr$Lipids / icr$set_1 * 10
+icr$UnSaturated_Hydrocarbons_norm <- icr$UnSaturated_Hydrocarbons / icr$set_1 * 10
+icr$Condensed_Hydrocarbons_norm <- icr$Condensed_Hydrocarbons / icr$set_1 * 10
+icr$Proteins_norm <- icr$Proteins / icr$set_1 * 10
+icr$Amino_Sugars_norm <- icr$Amino_Sugars / icr$set_1 * 10
+icr$Carbohydrates_norm <- icr$Carbohydrates / icr$set_1 * 10
+icr$Lignin_norm <- icr$Lignin / icr$set_1 * 10
+icr$Tannins_norm <- icr$Tannins / icr$set_1 * 10
   
-icr$Aliphatics_norm <- icr$Aliphatics / icr$set_2
-icr$AliphaticsN_norm <- icr$AliphaticsN / icr$set_2
-icr$Saturated_norm <- icr$Saturated / icr$set_2
-icr$Condensed_Aromatics_norm <- icr$Condensed_Aromatics / icr$set_2
-icr$Aromatic_norm <- icr$Aromatic / icr$set_2
-icr$LigninPhenolics_norm <- icr$LigninPhenolics / icr$set_2
-
-colnames(icr)
+icr$Aliphatics_norm <- icr$Aliphatics / icr$set_2 * 10
+icr$AliphaticsN_norm <- icr$AliphaticsN / icr$set_2 * 10
+icr$Saturated_norm <- icr$Saturated / icr$set_2 * 10
+icr$Condensed_Aromatics_norm <- icr$Condensed_Aromatics / icr$set_2 * 10
+icr$Aromatic_norm <- icr$Aromatic / icr$set_2 * 10
+icr$LigninPhenolics_norm <- icr$LigninPhenolics / icr$set_2 * 10
 
 icr_norm <- icr[, c(1:21, 40:53)] #Subsetting only normalized values
 
-#Another idea would be to run a PCA or NMDS on the initial “raw” dataset. You could see to what extent the different extractions cluster, and if the different locations/depths cluster together or group separately. See fig. 3 in Graham et al. 
 ```
 
 
@@ -88,6 +87,7 @@ sample_key <- sample_key %>%
 
 sample_key$top_cm <- as.numeric(sample_key$top_cm)
 sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
+sample_key$depth_category <- ifelse(sample_key$top_cm < 40, "surface", ifelse(sample_key$top_cm > 90, "deep", "middle"))
 
 icr_total_norm <- merge(icr_norm, sample_key, all.x=TRUE) #all.x=TRUE to keep blanks
 
@@ -99,17 +99,75 @@ colnames(soils)[2] <- "Location"
 icr_total_merge <- merge(icr_total_norm, soils)
 
 # Melt the data
-icr_melt <- melt(icr_total_merge, id=c("ID", "extract", "type", "top_cm", "btm_cm", "rep", "location", "Location", "Depth_cm"))
+icr_melt <- melt(icr_total_merge, id=c("ID", "extract", "type", "top_cm", "btm_cm", "rep", "location", "Location", "Depth_cm", "depth_category"))
 
-icr_melt$extract <- as.factor(icr_melt$extract)
-icr_melt$location <- as.factor(icr_melt$location)
+icr_melt$extract <- factor(icr_melt$extract, levels = c("Dith", "HCl", "PP", "H2O"))
+icr_melt$location <- factor(icr_melt$location)
 
+# Averages of ICR data
 icr_melt_averages <- icr_melt %>%
   group_by(Location, Depth_cm, variable) %>%
   summarize(value.mean= mean(value), value.sd = sd(value))
 
 ```
 
+## NMDS using Vegan
+```{r}
+#Another idea would be to run a PCA or NMDS on the initial “raw” dataset. You could see to what extent the different extractions cluster, and if the different locations/depths cluster together or group separately. See fig. 3 in Graham et al. 
+
+# cluster by extraction (H2O, PP, HCl, Dith)
+icr_total <- icr[, c(1:37)]
+icr_total <- merge(icr_total, sample_key, all.x=TRUE) #all.x=TRUE to keep blanks
+
+icr_total <- icr_total %>%
+  unite(ID_extract, ID, extract, sep="_", remove=FALSE)
+
+# change ID to rownames
+icr_total <- icr_total %>% 
+  remove_rownames %>% 
+  column_to_rownames(var="ID_extract")
+
+colnames(icr_total)
+
+icr_nmds <- icr_total[, c(13:25, 27:36)]
+icr_metatable <- icr_total[, c(1,2,42)]
+icr_metatable <- icr_metatable[rownames(icr_nmds),]
+
+
+#http://geoffreyzahn.com/nmds-example/
+fticr_dist <- as.matrix((vegdist(icr_nmds, "bray")))
+
+NMDS <- metaMDS(fticr_dist)
+
+# Build a data frame with NMDS coordinates and metadata
+MDS1 <- NMDS$points[,1]
+MDS2 <- NMDS$points[,2]
+NMDS <- data.frame(MDS1 = MDS1, MDS2 = MDS2, Extract = icr_metatable$extract, Depth = icr_metatable$depth_category)
+
+ggplot(NMDS) +
+  stat_ellipse(aes(x=MDS1, y=MDS2, col=Extract)) +
+  geom_point(aes(x=MDS1, y=MDS2, col=Extract, shape=Depth)) +
+  theme_bw() +
+  ggtitle("NMDS, East River FT-ICR-MS")
+
+p1 <- ggplot(subset(NMDS, Depth %in% "surface")) +
+  aes(x=MDS1, y=MDS2, col=Extract) +
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() +
+  ggtitle("surface soils")
+
+p2 <- ggplot(subset(NMDS, Depth %in% "middle")) +
+  aes(x=MDS1, y=MDS2, col=Extract) +
+  geom_point() +
+  stat_ellipse() +
+  theme_bw() +
+  ggtitle("subsurface soils")
+
+#Plot together with shared legend
+ggarrange(p1, p2, ncol=1, nrow=2, common.legend = TRUE, legend="right")
+
+```
 
 ## Plots
 ```{r}
@@ -119,7 +177,6 @@ ggplot(icr_total) +
   facet_wrap(~extract, scales="free")
 
 # Melted data
-
 ggplot(subset(icr_melt, extract %in% "H2O")) +
   aes(x=top_cm, y=value) +
   geom_point() +
@@ -147,5 +204,79 @@ ggplot(subset(icr_melt, extract %in% "Dith")) +
   geom_smooth() +
   facet_wrap(~variable, scales="free") +
   ggtitle("Dithionite-extractable carbon")
+
+# Bar plots for relative distribution, "set 1"
+ggplot(subset(icr_melt, extract %in% "H2O" & depth_category %in% c("surface", "middle") & variable %in% c("Lipids_norm", "UnSaturated_Hydrocarbons_norm", "Condensed_Hydrocarbons_norm", "Proteins_norm", "Amino_Sugars_norm", "Carbohydrates_norm", "Lignin_norm", "Tannins_norm"))) +
+  aes(x="", y = value, fill = variable) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) + 
+  facet_wrap(~depth_category) +
+  ggtitle("Water-extractable carbon (set 1)") +
+  scale_fill_discrete(name="Compound class")
+
+ggplot(subset(icr_melt, extract %in% "PP" & depth_category %in% c("surface", "middle") & variable %in% c("Lipids_norm", "UnSaturated_Hydrocarbons_norm", "Condensed_Hydrocarbons_norm", "Proteins_norm", "Amino_Sugars_norm", "Carbohydrates_norm", "Lignin_norm", "Tannins_norm"))) +
+  aes(x="", y = value, fill = variable) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) + 
+  facet_wrap(~depth_category) +
+  ggtitle("Pyrophosphate-extractable carbon (set 1)") +
+  scale_fill_discrete(name="Compound class")
+
+ggplot(subset(icr_melt, extract %in% "HCl" & depth_category %in% c("surface", "middle") & variable %in% c("Lipids_norm", "UnSaturated_Hydrocarbons_norm", "Condensed_Hydrocarbons_norm", "Proteins_norm", "Amino_Sugars_norm", "Carbohydrates_norm", "Lignin_norm", "Tannins_norm"))) +
+  aes(x="", y = value, fill = variable) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) + 
+  facet_wrap(~depth_category) +
+  ggtitle("HCl-extractable carbon (set 1)") +
+  scale_fill_discrete(name="Compound class")
+
+ggplot(subset(icr_melt, extract %in% "Dith" & depth_category %in% c("surface", "middle") & variable %in% c("Lipids_norm", "UnSaturated_Hydrocarbons_norm", "Condensed_Hydrocarbons_norm", "Proteins_norm", "Amino_Sugars_norm", "Carbohydrates_norm", "Lignin_norm", "Tannins_norm"))) +
+  aes(x="", y = value, fill = variable) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) + 
+  facet_wrap(~depth_category) +
+  ggtitle("Dithionite-extractable carbon (set 1)") +
+  scale_fill_discrete(name="Compound class")
+
+# Bar plots for relative distribution, "set 2"
+ggplot(subset(icr_melt, extract %in% "H2O" & depth_category %in% c("surface", "middle") & variable %in% c("Aliphatics_norm", "AliphaticsN_norm", "Saturated_norm", "Condensed_Aromatics_norm", "Aromatic_norm", "LigninPhenolics_norm"))) +
+  aes(x="", y = value, fill = variable) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) + 
+  facet_wrap(~depth_category) +
+  ggtitle("Water-extractable carbon (set 2)") +
+  scale_fill_discrete(name="Compound class")
+
+
+
+
+# Stacked bar plots
+g1 <- ggplot(subset(icr_melt, depth_category %in% "surface" & variable %in% c("Lipids_norm", "UnSaturated_Hydrocarbons_norm", "Condensed_Hydrocarbons_norm", "Proteins_norm", "Amino_Sugars_norm", "Carbohydrates_norm", "Lignin_norm", "Tannins_norm"))) +
+  aes(y=value, x=extract, fill=variable) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("Surface") + ylab("") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_fill_discrete(name="Compound class")
+
+g2 <- ggplot(subset(icr_melt, depth_category %in% "middle" & variable %in% c("Lipids_norm", "UnSaturated_Hydrocarbons_norm", "Condensed_Hydrocarbons_norm", "Proteins_norm", "Amino_Sugars_norm", "Carbohydrates_norm", "Lignin_norm", "Tannins_norm"))) +
+  aes(y=value, x=extract, fill=variable) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("Subsurface") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_fill_discrete(name="Compound class")
+
+#Plot together with shared legend
+ggarrange(g1, g2, ncol=1, nrow=2, common.legend = TRUE, legend="right")
+
 ```
 
