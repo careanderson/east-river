@@ -1,0 +1,191 @@
+---
+title: "East River Discharge vs. Snow""
+author: "CGA"
+date: "March 27, 2018"
+output:
+  pdf_document: default
+  html_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(reshape2)
+library(lubridate)
+setwd("~/east-river/") #set the working directory
+```
+
+## 1. Read in snow and discharge data
+```{r}
+# Snow
+# http://www.gothicwx.org/long-term-snow.html
+# Measured in cm
+snow <- read_excel("Data/billybarr_snowdata.xlsx")
+colnames(snow)[c(14:16)] <- c("onground_april1", "onground_may1", "onground")
+
+# Discharge
+# https://waterdata.usgs.gov/nwis/uv/?site_no=09112500&PARAmeter_cd=00060,00065
+# Measured in cubic feet per second
+discharge <- read_tsv("Data/east_river_almont_discharge.txt", skip=31)
+discharge <- discharge[-1, ] #remove first row
+
+```
+
+## 2. Snow data
+```{r}
+snow2 <- snow[ , -c(13:16)] #removing summary columns #Converting date column
+
+# Total snow fall, by winter season
+snow2$total_cm <- -999
+snow2$total_cm <- rowSums(snow2[ ,c(2:12)], na.rm=TRUE)
+
+# Changing "Winter" to "Year"
+snow2 <- snow2 %>%
+  separate(Winter, c("start", "end"), "-")
+
+# Add "19" or "20" in front of spring years
+snow2$end <- ifelse(snow2$start > 1973 & snow2$start < 1999, paste0("19", snow2$end), paste0("20", snow2$end))
+
+# Subset just "end" and "total"
+snow_total <- snow2[, c("end","total_cm")]
+
+
+
+
+
+
+
+
+
+# Melting the snow data, by winter
+snow_melt <- melt(snow2, id.vars="Winter")
+
+# split Winter column into two years
+snow_melt <- snow_melt %>%
+  separate(Winter, c("fall", "spring"), "-")
+
+# Add "19" or "20" in front of spring years
+snow_melt$spring <- ifelse(snow_melt$fall > 1973 & snow_melt$fall < 1999, paste0("19", snow_melt$spring), paste0("20", snow_melt$spring))
+
+# List of months
+fall <- c("Sept.", "Oct.", "Nov.", "Dec.")
+spring <- c("Jan", "Feb", "Mar", "Apr", "May", "June", "July")
+
+snow_melt$year <- ifelse(snow_melt$variable %in% fall, snow_melt$fall, snow_melt$spring)
+
+snow_melt$day = 1 #Arbitrary day column (day = 1)
+
+# Month names to numbers
+x <- c("Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Sept.", "Oct.", "Nov.", "Dec.")
+y <- c(1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12)
+x_name <- "variable"
+y_name <- "month"
+
+months <- data.frame(x,y)
+colnames(months) <- c(x_name, y_name)
+
+snow_melt <- merge(snow_melt, months)
+
+# Get month/date into POSIXct year-month-date format (e.g., 1987-03-01)
+snow_melt$date <- as.Date(with(snow_melt, paste(year, month, day, sep="-")), "%Y-%m-%d")
+
+#snow_melt$date2 <- as.POSIXct(snow_melt$date, format = "%Y-%m-%d %H:%M") # doing something weird with the time
+
+# Remove irrelevant columns
+snow_melt <- snow_melt[, c("value", "date")]
+colnames(snow_melt) <- c("snow_cm", "month")
+
+```
+
+##. 3. Discharge data
+```{r}
+discharge2 <- discharge[ , c(3,5)] #Only taking date/time and discharge columns
+
+colnames(discharge2)[2] <- "discharge_cfs" #Rename discharge column
+
+# Converting date column
+discharge2$datetime <- as.POSIXct(discharge2$datetime, format = "%Y-%m-%d %H:%M")
+discharge2$date <- as.Date(discharge2$datetime, "%Y-%m-%d")
+
+discharge2$discharge_cfs <- as.numeric((discharge2$discharge_cfs)) #Discharge data as numeric
+
+discharge_noNA <- discharge2[!is.na(discharge2$discharge_cfs), ] #Filter out NAs
+
+# Total by month
+discharge_month <- discharge_noNA %>%
+  group_by(month=floor_date(date, "month")) %>%
+  summarize(total_discharge_cfs = sum(discharge_cfs))
+
+ggplot(discharge_month) +
+  aes(x=month, y=total_discharge_cfs) +
+  geom_point()
+
+# Spring snowmelt totals (May, June, July, August)
+discharge_spring <- subset(discharge_month, format(discharge_month$month, "%m") %in% c("05","06","07","08"))
+
+discharge_spring$year <- format(discharge_spring$month, "%Y")
+discharge_spring_sum <- as.data.frame(tapply(discharge_spring$total_discharge_cfs, discharge_spring$year, FUN = sum))
+
+install.packages("data.table")
+library(data.table)
+
+setDT(discharge_spring_sum, keep.rownames = TRUE)[]
+colnames(discharge_spring_sum)[c(1:2)] <- c("end", "discharge_cfs")
+
+```
+
+##. 4. Snow-discharge data
+```{r}
+# Maybe compare gauge height with discharge? Come up with equation/correlation to convert, or estimate gauge height?
+
+# Graph snowmelt
+ggplot(snow_melt) +
+  aes(x=month, y=snow_cm) +
+  geom_point()
+
+# Graph discharge
+ggplot(discharge_month) +
+  aes(x=month, y=total_discharge_cfs) +
+  geom_point()
+
+# Merge the data frames
+total <- merge(snow_melt, discharge_month, by="month", all.x=TRUE, all.y=TRUE)
+total2 <- left_join(snow_melt, discharge_month, by=c("month"))
+
+# Discharge vs. snowmelt
+ggplot(total) +
+  aes(x=snow_cm, y=total_discharge_cfs) +
+  geom_point()
+
+# Convert total$month to POSIXtime
+total$month_posix <- total$month
+total$month_posix <- as.POSIXct(total$month_posix)
+
+#Subset with only spring melt months
+ggplot(subset(total, format(total$month_posix, "%m") %in% c("05","06","07","08"))) +
+  aes(x=snow_cm, y=total_discharge_cfs) +
+  geom_point()
+       
+
+
+
+
+
+
+# Merge total snow data with spring discharge data
+snow2$end
+discharge_spring_sum
+
+total_spring <- merge(snow_total, discharge_spring_sum)
+
+ggplot(total_spring) +
+  aes(x=total_cm, y=discharge_cfs) +
+  geom_point() +
+  xlab("Total snowfall (cm)") + ylab("East River discharge, May-Aug (cfs)")
+
+
+
+```
