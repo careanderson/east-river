@@ -50,33 +50,78 @@ mp$extraction <- as.character(mp$extraction)
 mp$extraction[mp$extraction == "h20"] <- "h2o"
 
 toc_mp <- merge(TOC_samples, mp, by=c("ID", "extraction"))
+
 ```
 
-## Prelim figures
+## Correct TOC data, figures
 ```{r}
-ggplot(subset(toc_mp, `Element.Label` %in% "Al")) +
-  aes(x=top_cm, y=c_ppm) +
+
+# 10x dilution for pyrophosphate, 2x dilution for all others
+#Need to report C in mol C g-1 soil, so you will want to multiply the initial value (mg L-1) by (volume of extractant in L/mass of soil in g). The resulting number is then divided by 12 mg mmol-1 (or g mol-1). FYI - multiply by 1000 to get mmol C g-1.
+toc_mp$mol_c_per_g[toc_mp$extraction=="pp"] <- 
+  (toc_mp$c_ppm[toc_mp$extraction=="pp"] * 10) * (0.01/0.33) * (1/12)
+
+toc_mp$mol_c_per_g[toc_mp$extraction=="dith"] <- 
+  (toc_mp$c_ppm[toc_mp$extraction=="dith"] * 2) * (0.01/0.33) * (1/12)
+
+toc_mp$mol_c_per_g[toc_mp$extraction=="hcl"] <- 
+  (toc_mp$c_ppm[toc_mp$extraction=="hcl"] * 2) * (0.01/0.33) * (1/12)
+
+toc_mp$mol_c_per_g[toc_mp$extraction=="h2o"] <- 
+  (toc_mp$c_ppm[toc_mp$extraction=="h2o"] * 2) * (0.01/0.33) * (1/12)
+
+
+# TOC figures (amount per depth across transect)
+toc_mp$extraction <- factor(toc_mp$extraction, levels = c("dith", "hcl", "pp", "h2o"))
+toc_mp$depth_category <- factor(toc_mp$depth_category, levels = unique(toc_mp$depth_category))
+
+ggplot(subset(toc_mp, `Element.Label` %in% "Fe" & depth_category %in% c("shallow", "subsurface"))) +
+  aes(x=depth_category, y=mol_c_per_g, fill=extraction) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("") + ylab(expression(Organic~Carbon~(mol~g^-1))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.y = element_text(size = 35),
+        legend.title=element_text(size=27),
+        legend.text=element_text(size=27),
+        legend.position = 'top', 
+        legend.spacing = unit(16, 'pt')) +
+  scale_fill_discrete(name="", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite")) +
+  facet_grid(location~.)
+
+
+# TOC vs. metals
+ggplot(subset(toc_mp, `Element.Label` %in% "Fe")) +
+  aes(x=top_cm, y=mol_c_per_g) +
   geom_point() +
   facet_wrap(~extraction, scales="free") +
   xlab("soil depth (cm)") + ylab("TOC (ppm)")
+
+toc_mp$extraction2 <- factor(toc_mp$extraction, levels = c("h2o", "pp", "hcl", "dith"))
+levels(toc_mp$extraction2) <- c("Water", "Pyrophosphate", "HCl", "Dithionite")
 
 ggplot(subset(toc_mp, `Element.Label` %in% "Fe")) +
-  aes(x=top_cm, y=c_ppm) +
-  geom_point() +
-  facet_wrap(~extraction, scales="free") +
-  xlab("soil depth (cm)") + ylab("TOC (ppm)")
+  aes(x=Concentration_corrected, y=mol_c_per_g) +
+  geom_point(aes(color=location, size=3)) + geom_smooth(method="lm") +
+  facet_wrap(~extraction2, scales="free") +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mol~g^-1))) +
+  labs(color= "Location") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 35),
+        legend.title=element_text(size=30),
+        legend.text=element_text(size=30),
+        legend.key.size = unit(3,"point")) +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=5)))
 
-
-ggplot(subset(toc_mp, `Element.Label` %in% "Al")) +
-  aes(x=Concentration, y=c_ppm) +
-  geom_point() +
-  facet_wrap(~extraction, scales="free")
-
-ggplot(toc_mp) +
-  aes(x=Concentration, y=c_ppm, color=top_cm) +
-  geom_point() +
-  facet_wrap(~extraction+`Element.Label`, scales="free") +
-  xlab("element concentration (ppm)") + ylab("TOC (ppm)")
 ```
 
 ## TOTAL NITROGEN
@@ -99,6 +144,24 @@ TN_samples$n_ppm <- as.numeric(as.character(TN_samples$n_ppm))
 # Separate the sample column
 TN_samples <- TN_samples %>%
   separate(sample, c("ID", "extraction", "dilution_tn"), "-")
+
+TN_samples$extraction <- factor(TN_samples$extraction, levels = c("h2o", "pp", "hcl", "dith"))
+#levels(TN_samples$extraction) <- c("Water", "Pyrophosphate", "HCl", "Dithionite")
+
+
+# Correct for soil weights, dilution (10x for pyrophosphate, 2x for all others), convert to mmol TN L-1
+#(x TN)(mg L-1)*(1/14.0067) ((mmol mg-1)-1) = x mmol TN L-1
+TN_samples$mol_n_per_g[TN_samples$extraction=="pp"] <- 
+  (TN_samples$n_ppm[TN_samples$extraction=="pp"] * 10) * (0.01/0.33) * (1/14.0067)
+
+TN_samples$mol_n_per_g[TN_samples$extraction=="dith"] <- 
+  (TN_samples$n_ppm[TN_samples$extraction=="dith"] * 2) * (0.01/0.33) * (1/14.0067)
+
+TN_samples$mol_n_per_g[TN_samples$extraction=="hcl"] <- 
+  (TN_samples$n_ppm[TN_samples$extraction=="hcl"] * 2) * (0.01/0.33) * (1/14.0067)
+
+TN_samples$mol_n_per_g[TN_samples$extraction=="h2o"] <- 
+  (TN_samples$n_ppm[TN_samples$extraction=="h2o"] * 2) * (0.01/0.33) * (1/14.0067)
 
 # Merge with TOC/MP data
 total_toc_tn <- merge(TN_samples, toc_mp, by=c("ID", "extraction"))
@@ -129,10 +192,4 @@ ggplot(total_toc_tn) +
   geom_point() +
   facet_wrap(~extraction, scales="free")
 
-```
-
-## To do
-```{r}
-# Correct MP data for soil weight/dilutions
-# TIC? (= TN - TOC?)
 ```

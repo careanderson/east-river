@@ -20,9 +20,9 @@ setwd("~/east-river/")
 ## Load and tidy Acclima logger files
 ```{r}
 
-mc4 <- read.csv("Data/acclima_raw/DataSnapExport_230720180947_datasnap3_mc4.csv")
-mc3 <- read.csv("Data/acclima_raw/DataSnapExport_230720180949_datasnap1_mc3.csv")
-mc1 <- read.csv("Data/acclima_raw/DataSnapExport_230720180952_datasnap2_mc1.csv")
+mc4 <- read.csv("Data/acclima_raw/DataSnapExport_090820181200_datasnap3_mc4.csv")
+mc3 <- read.csv("Data/acclima_raw/DataSnapExport_090820181246_datasnap1_mc3.csv")
+mc1 <- read.csv("Data/acclima_raw/DataSnapExport_090820181012_datasnap2_mc1.csv")
 
 # change column names
 colnames(mc4) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
