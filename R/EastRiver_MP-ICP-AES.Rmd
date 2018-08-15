@@ -13,14 +13,15 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(reshape2)
+library(ggpubr)
 # Set working directory
 setwd("~/east-river/")
 ```
 
 ### 1. Read in and tidy the MP-ICP-AES data
 ```{r}
-mp1 <- read.csv("Data/MP-ICP-AES/3April2018_GG_EastRiver_BulkSeq.csv", skip=2)[, c(1,5,8)]
-mp2 <- read.csv("Data/MP-ICP-AES/5April2018_GG_EastRiver_BulkSeq.csv", skip=2)[, c(1,5,8)]
+mp1 <- read.csv("Data/MP-ICP-AES/3April2018_GG_EastRiver_BulkSeq.csv", skip=2)[, c(1,5,8)] # with 10 for intensity
+mp2 <- read.csv("Data/MP-ICP-AES/5April2018_GG_EastRiver_BulkSeq.csv", skip=2)[, c(1,5,8)] # with 10 for intensity
 
 # Row-bind the two sample data frames together
 mp <- rbind(mp1, mp2)
@@ -152,7 +153,7 @@ ggplot(subset(mp_melt, depth_category %in% c("shallow", "subsurface") & Element.
         legend.text=element_text(size=27),
         legend.position = 'top', 
         legend.spacing = unit(16, 'pt')) +
-  scale_fill_discrete(name="", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite")) +
+  scale_fill_manual(name="", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite"), values=rev(c("#0072B2", "#F0E442", "#000000", "#009E73"))) +
   facet_grid(location~.)
 
 ```
@@ -181,13 +182,6 @@ ggplot(subset(total, Element.Label %in% "Fe")) +
   geom_smooth(method="lm") +
   facet_wrap(~extraction, scales= "free")
 
-# Al data
-ggplot(subset(total, Element.Label %in% "Al")) +
-  aes(x=top_cm, y=Concentration) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  facet_wrap(~extraction, scales= "free")
-
 # gradient plot
 ggplot(subset(total, Element.Label %in% "Fe")) +
   aes(x=top_cm, y=Concentration, color=location) +
@@ -200,12 +194,16 @@ ggplot(subset(total, Element.Label %in% "Fe")) +
 
 ## TP Data
 ```{r}
-# Check standard curves (need to add column 10 "intensity" back in above)
+# Check standard curves (need to add column 10 "intensity" back in above); run script thru end of mp_total
 mp_standards <- mp[grep("Standard", mp$Label), ]
 mp_P_standards <- mp_standards[grep("P", mp$Element.Label), ]
 mp_P_standards$Intensity <- as.numeric(as.character(mp_P_standards$Intensity))
 mp_P_standards <- mp_P_standards[complete.cases(mp_P_standards), ]
 
+# Playing with standard curve
+#mp_P_standards <- mp_P_standards[c(1:4),]
+
+rownames(mp_P_standards)
 ggplot(mp_P_standards) +
   aes(x=Concentration, y=Intensity) +
   geom_point()
@@ -219,6 +217,12 @@ coef(TP_model) # b=1973.1938, m=300.9132
 
 # Extract TP data
 mp_p <- subset(mp_total, Element.Label %in% "P")
+
+# Convert TP data from intensity to concentration, based on above line
+#mp_p$Intensity <- as.numeric(as.character(mp_p$Intensity))
+#mp_p$Concentration_recalc <- (mp_p$Intensity - 33.4050) / 877.2468 
+
+# Rename columns
 colnames(mp_p)[c(6,11)] <- c("TP_Concentration", "TP_Concentration_corrected")
 colnames(phos_all_merge)[c(3,4)] <- c("Phos_Concentration", "Phos_Concentration_corrected")
 
@@ -250,11 +254,11 @@ levels(p_melt$extraction2) <- c("Dithionite",  "HCl", "Pyrophosphate", "Water")
 summary(unique(p_melt$variable))
 # Make figure for TOP vs. TIP; bar plot like ICR data
 # Stacked bar plots
-p1 <- ggplot(subset(p_melt, depth_category %in% "shallow" & variable %in% c("Phos_Concentration_corrected", "TOP"))) +
+p1 <- ggplot(subset(p_melt, depth_category %in% "shallow" & extraction %in% c("h2o","hcl","dith") & variable %in% c("Phos_Concentration_corrected", "TOP"))) +
   aes(y=value, x=extraction2, fill=variable) +
   geom_bar(stat="identity") +
   coord_flip() +
-  xlab("Shallow") + ylab(expression(Phosphorus~(mmol~g^-1))) +
+  xlab("Shallow") + ylab("") +
   theme_bw() +
   theme(axis.text = element_text(size = 25),
         axis.title = element_text(size = 35),
@@ -263,11 +267,12 @@ p1 <- ggplot(subset(p_melt, depth_category %in% "shallow" & variable %in% c("Pho
         legend.title=element_text(size=30),
         legend.text=element_text(size=30),
         axis.text.y = element_text(angle = 60, vjust = 0.5, hjust=0.85)) +
-    scale_fill_discrete(name="",
+    scale_fill_manual(name="",
                       breaks=c("TOP", "Phos_Concentration_corrected"),
-                      labels=c("Organic P", "Inorganic P"))
+                      labels=c("Organic", "Inorganic"),
+                      values=c("black","#0072B2"))
 
-p2 <- ggplot(subset(p_melt, depth_category %in% "subsurface" & variable %in% c("Phos_Concentration_corrected", "TOP"))) +
+p2 <- ggplot(subset(p_melt, depth_category %in% "subsurface" & extraction %in% c("h2o","hcl","dith") & variable %in% c("Phos_Concentration_corrected", "TOP"))) +
   aes(y=value, x=extraction2, fill=variable) +
   geom_bar(stat="identity") +
   coord_flip() +
@@ -280,12 +285,144 @@ p2 <- ggplot(subset(p_melt, depth_category %in% "subsurface" & variable %in% c("
         legend.title=element_text(size=30),
         legend.text=element_text(size=30),
         axis.text.y = element_text(angle = 60, vjust = 0.5, hjust=0.85)) +
-    scale_fill_discrete(name="",
+    scale_fill_manual(name="",
                       breaks=c("TOP", "Phos_Concentration_corrected"),
-                      labels=c("Organic P", "Inorganic P"))
+                      labels=c("Organic", "Inorganic"),
+                      values=c("black","#0072B2"))
 
 #Plot together with shared legend
 ggarrange(p1, p2, ncol=1, nrow=2, common.legend = TRUE, legend="right")
+
+```
+
+
+## Combine MP data with total C, N data
+```{r}
+
+total_bulk_cn <- read.csv("Data/EA_data/25April2018_EA_bulk_processed.csv")
+
+# Manually changing sd of sample 60 to zero (will rerun on EA in replication to get actual sd)
+# Double check data alignment
+total_bulk_cn$C_sd[1] <- 0
+total_bulk_cn$N_sd[1] <- 0
+
+# Convert ppm to mmol/g
+
+## Convert concentrations (ppm) to unit soil, fraction of total element (C, N)
+# Per 0.2g soil
+# Divide ppm by 10,000 to get % by weight
+
+total_bulk_cn$C_wt_percent <- total_bulk_cn$C_mean * (1/.2) / 10000
+
+# Prelim figure of total C profile across depth/meander, with standard deviations
+ggplot(total_bulk_cn) +
+  aes(x=top_cm, y=C_mean) + 
+  xlab("Soil depth (cm)") + ylab("Total C in bulk soil (%)") +
+  geom_errorbar(aes(ymin=C_mean-C_sd, ymax=C_mean+C_sd), width=0.8, color="grey") +
+  geom_point(size = 2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 24),
+        axis.title = element_text(size = 24),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# Remove "rep" from total_bulk_cn
+total_bulk_cn$rep <- NULL
+# Merge data files
+total_icp_cn <- merge(total_bulk_cn, mp_total)
+
+# Change extraction labels for the facet_wrap
+
+extraction_names <- c(
+  h2o = "Water",
+  pp = "Pyrophosphate",
+  hcl = "HCl",
+  dith = "Dithionite"
+)
+
+# Total C vs. extractions (Fe, Al)
+total_icp_cn$extraction <- factor(total_icp_cn$extraction, levels = c("h2o", "pp", "hcl", "dith"))
+levels(total_icp_cn$extraction) <- c( "Water", "Pyrophosphate", "HCl", "Dithionite")
+
+ggplot(subset(total_icp_cn, `Element.Label` %in% "Fe" & depth_category %in% c("shallow", "subsurface"))) +
+  aes(x=Concentration_corrected, y=C_wt_percent) +
+  geom_point(aes(size=3, color=depth_category)) +
+  geom_smooth(method="lm") +
+#  ggtitle("Total C in bulk soil vs. Fe ppm by extraction type") +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab("Soil C (weight %)") +
+  facet_wrap(~extraction, scales="free") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 17),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 35),
+        legend.title=element_text(size=27),
+        legend.text=element_text(size=27),
+        legend.position = "top") +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=5))) +
+  scale_color_manual(name="",
+                    breaks=c("shallow", "subsurface"),
+                    labels=c("Shallow", "Subsurface"),
+                    values=c("#CCCCCC", "#333333"))
+
+ggplot(subset(total_icp_cn, Element.Label %in% "Al")) +
+  aes(x=Concentration_corrected, y=C_wt_percent) +
+  geom_point() +
+  geom_smooth(method="lm") +
+#  ggtitle("Total C in bulk soil vs. Al ppm by extraction type") +
+  xlab(expression(Aluminum~(mmol~g^-1))) + ylab("Total C in bulk soil (%)") +
+  facet_wrap(~extraction, scales="free", labeller = as_labeller(extraction_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(size=15))
+
+
+
+
+# R2 and p-values for total C vs. Fe correlations (by extraction)
+fe_c_water <- subset(total_icp_cn, `Element.Label` %in% "Fe" & extraction %in% "Water")
+fe_c_pp <- subset(total_icp_cn, `Element.Label` %in% "Fe" & extraction %in% "Pyrophosphate")
+fe_c_hcl <- subset(total_icp_cn, `Element.Label` %in% "Fe" & extraction %in% "HCl")
+fe_c_dith <- subset(total_icp_cn, `Element.Label` %in% "Fe" & extraction %in% "Dithionite")
+
+fe_c_hcl_shallow <- subset(fe_c_hcl, depth_category %in% "shallow")
+fe_c_hcl_subsurface <- subset(fe_c_hcl, depth_category %in% "subsurface")
+
+# Water
+plot(fe_c_water$Concentration_corrected, fe_c_water$C_wt_percent)
+fe_water_model <- lm(C_wt_percent ~ Concentration_corrected, data=fe_c_water)
+abline(fe_water_model, col = "red")
+summary(fe_water_model)
+
+# Pyrophosphate
+plot(fe_c_pp$Concentration_corrected, fe_c_pp$C_wt_percent)
+fe_pp_model <- lm(C_wt_percent ~ Concentration_corrected, data=fe_c_pp)
+abline(fe_pp_model, col = "red")
+summary(fe_pp_model)
+
+# HCl
+plot(fe_c_hcl$Concentration_corrected, fe_c_hcl$C_wt_percent)
+fe_hcl_model <- lm(C_wt_percent ~ Concentration_corrected, data=fe_c_hcl)
+abline(fe_hcl_model, col = "red")
+summary(fe_hcl_model)
+
+fe_hcl_shallow_model <- lm(C_wt_percent ~ Concentration_corrected, data=fe_c_hcl_shallow)
+summary(fe_hcl_shallow_model)
+
+fe_hcl_subsurface_model <- lm(C_wt_percent ~ Concentration_corrected, data=fe_c_hcl_subsurface)
+summary(fe_hcl_subsurface_model)
+
+
+# Dithionite
+plot(fe_c_dith$Concentration_corrected, fe_c_dith$C_wt_percent)
+fe_dith_model <- lm(C_wt_percent ~ Concentration_corrected, data=fe_c_dith)
+abline(fe_dith_model, col = "red")
+summary(fe_dith_model)
 
 ```
 
@@ -356,74 +493,6 @@ anova(lm(Concentration ~ top_cm, total_al_dith))
 
 anova(lm(Concentration ~ depth_class, total_fe_dith))
 anova(lm(Concentration ~ depth_class, total_al_dith))
-
-
-
-# -----------------------------------------------------------------------------
-# Combine with Total C and N data (bulk), test hypotheses
-# -----------------------------------------------------------------------------
-total_bulk_cn <- read.csv("Data/EA_data/12April2018_EA_bulk_processed.csv")[,-1]
-
-# Manually changing sd of sample 60 to zero (will rerun on EA in replication to get actual sd)
-# Double check data alignment
-total_bulk_cn$C_sd[19] <- 0
-
-# Prelim figure of total C profile across depth/meander, with standard deviations
-ggplot(total_bulk_cn) +
-  aes(x=top_cm, y=C_mean) + 
-  xlab("Soil depth (cm)") + ylab("Total C in bulk soil (%)") +
-  geom_errorbar(aes(ymin=C_mean-C_sd, ymax=C_mean+C_sd), width=0.8, color="grey") +
-  geom_point(size = 2) +
-  theme_bw() +
-  theme(axis.text = element_text(size = 24),
-        axis.title = element_text(size = 24),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-
-# Merge data files
-total_icp_cn <- merge(total_bulk_cn, total)
-
-
-# Change extraction labels for the facet_wrap
-
-extraction_names <- c(
-  dith = "dithionite",
-  h20 = "water",
-  hcl = "HCl",
-  pp = "pyrophosphate"
-)
-
-# Total C vs. extractions (Fe, Al)
-
-ggplot(subset(total_icp_cn, Element.Label %in% "Fe")) +
-  aes(x=Concentration, y=C_mean) +
-  geom_point() +
-  geom_smooth(method="lm") +
-#  ggtitle("Total C in bulk soil vs. Fe ppm by extraction type") +
-  xlab("Fe concentration (ppm), uncorrected") + ylab("Total C in bulk soil (%)") +
-  facet_wrap(~extraction, scales="free", labeller = as_labeller(extraction_names)) +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(size=15))
-
-ggplot(subset(total_icp_cn, Element.Label %in% "Al")) +
-  aes(x=Concentration, y=C_mean) +
-  geom_point() +
-  geom_smooth(method="lm") +
-#  ggtitle("Total C in bulk soil vs. Al ppm by extraction type") +
-  xlab("Al concentration (ppm), uncorrected") + ylab("Total C in bulk soil (%)") +
-  facet_wrap(~extraction, scales="free", labeller = as_labeller(extraction_names)) +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(size=15))
-
 
 
 # Testing hypotheses:

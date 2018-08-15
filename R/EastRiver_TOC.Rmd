@@ -90,7 +90,7 @@ ggplot(subset(toc_mp, `Element.Label` %in% "Fe" & depth_category %in% c("shallow
         legend.text=element_text(size=27),
         legend.position = 'top', 
         legend.spacing = unit(16, 'pt')) +
-  scale_fill_discrete(name="", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite")) +
+  scale_fill_manual(name="", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite"), values=rev(c("#0072B2", "#F0E442", "#000000", "#009E73"))) +
   facet_grid(location~.)
 
 
@@ -121,6 +121,36 @@ ggplot(subset(toc_mp, `Element.Label` %in% "Fe")) +
         legend.key.size = unit(3,"point")) +
   scale_size_continuous(guide=FALSE) +
   guides(color = guide_legend(override.aes = list(size=5)))
+
+# R2 and p-values for TOC vs. Fe correlations (by extraction)
+fe_toc_water <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "h2o")
+fe_toc_pp <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "pp")
+fe_toc_hcl <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "hcl")
+fe_toc_dith <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "dith")
+
+# Water
+plot(fe_toc_water$Concentration_corrected, fe_toc_water$mol_c_per_g)
+fe_water_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_water)
+abline(fe_water_model, col = "red")
+summary(fe_water_model)
+
+# Pyrophosphate
+plot(fe_toc_pp$Concentration_corrected, fe_toc_pp$mol_c_per_g)
+fe_pp_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_pp)
+abline(fe_pp_model, col = "red")
+summary(fe_pp_model)
+
+# HCl
+plot(fe_toc_hcl$Concentration_corrected, fe_toc_hcl$mol_c_per_g)
+fe_hcl_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_hcl)
+abline(fe_hcl_model, col = "red")
+summary(fe_hcl_model)
+
+# Dithionite
+plot(fe_toc_dith$Concentration_corrected, fe_toc_dith$mol_c_per_g)
+fe_dith_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_dith)
+abline(fe_dith_model, col = "red")
+summary(fe_dith_model)
 
 ```
 

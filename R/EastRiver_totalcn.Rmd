@@ -295,6 +295,77 @@ total_cn_massfrac_comp_av <- total_cn_massfrac_comp %>%
 # Export as csv
 #write.csv(total_cn_massfrac_comp_av, "Data/EA_data/25April2018_EA_total_cn_massfrac_comp_processed.csv")
 
+```
+
+## Total P (from Derek, LBNL)
+```{r}
+# Import data
+totalp <- read_excel("Data/total_p/Floodplain_Total_Phosphorus.xlsx")
+
+totalp <- totalp %>%
+  separate(sample, c("location", "rep"), "-")
+
+colnames(totalp)[12] <- "p_mg_kg"
+colnames(totalp)[13] <- "p_sd"
+
+# Convert to mmol/g
+# P molar mass: 30.973762 g/mol
+# X mg/kg * (1 kg/1000 g) * (1 mol/30.97g) * (1 g / 1000 mg) * (1000 mmol/1 mol)
+
+totalp$p_mmol_g <- totalp$p_mg_kg * (1/1000) * (1/30.973762) * (1/1000) * (1000)
+totalp$p_mmol_g_sd <- totalp$p_sd * (1/1000) * (1/30.973762) * (1/1000) * (1000)
+
+# Merge with sample key
+# Read in the sample key file
+sample_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
+
+# Separate the "sample" column into two separate columns (location, rep)
+sample_key <- sample_key %>%
+  separate(sample, c("location", "rep"), "-")
+
+# Separate the "depth_cm" column into two separate columns (top_cm, btm_cm)
+sample_key <- sample_key %>%
+  separate(depth_cm, c("top_cm", "btm_cm"), "-")
+
+# Convert the soil depths to numeric, so R treats them as numbers (and not characters).
+sample_key$top_cm <- as.numeric(sample_key$top_cm)
+sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
+
+## Depth categories
+sample_key$depth_category <- ifelse(sample_key$top_cm < 40, "shallow", ifelse(sample_key$top_cm > 90, "deep", "subsurface"))
+
+# Make "depth_category" a factor, and order the depth classes
+sample_key$depth_category <- factor(sample_key$depth_category, levels = c("shallow", "subsurface", "deep"))
+sample_key$location <- factor(sample_key$location)
+
+
+# Merge the total P data with the sample key, using the common column "ID".
+p_total_key <- merge(totalp, sample_key, by=c("ID", "location", "rep"))
+p_total_key$depth_category <- factor(p_total_key$depth_category, levels = unique(p_total_key$depth_category))
+
+p_processed <- p_total_key %>%
+  group_by(location, depth_category) %>%
+  summarise(p_mean= mean(p_mmol_g), p_sd= sd(p_mmol_g))
+
+
+ggplot(subset(p_processed, depth_category %in% c("shallow", "subsurface"))) +
+  aes(y=p_mean, x=depth_category, fill=depth_category) +
+  geom_bar(stat="identity", position="dodge") +
+  geom_errorbar(aes(ymin=p_mean-p_sd, ymax=p_mean+p_sd), width=.2, position="dodge") +
+  coord_flip() +
+  facet_grid(location~.) +
+  xlab("") + ylab(expression(Phosphorus~(mmol~g^-1))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.y = element_text(size = 35),
+        legend.position="none") +
+  scale_fill_manual(name="",
+                    breaks=c("shallow", "subsurface"),
+                    labels=c("Shallow", "Subsurface"),
+                    values=c("#333333","#CCCCCC"))
 
 
 ```
