@@ -1,0 +1,164 @@
+---
+title: "EastRiver_watertabledepth"
+author: "CGA"
+date: "September 5, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(reshape2)
+library(ggsci)
+library(zoo)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load water sampling data, clean up
+```{r}
+water <- read_excel("Data/2018_fielddata/5Sept2018_summer2018_water samples.xlsx", skip=5)
+
+colnames(water) <- c("well", "date", "time", "toc_to_water_ft", "toc_to_water_cm", "toc_to_ground_cm", "water_level_bgs_cm", "ph", "temp", "cond", "orp", "notes")
+colnames(water)
+
+# Subset just the water table depth
+wtd <- water[, c(1,2,3,7)]
+
+# Take out NAs
+wtd_nona <-
+  wtd %>% drop_na(water_level_bgs_cm)
+
+# Change date to as.Date (instead of POSIXct)
+wtd_nona$date <- as.Date(wtd_nona$date)
+
+```
+
+## Separate into different wells
+```{r}
+# MCP
+wtd_mcp1 <- subset(wtd_nona, well %in% "MCP-1")
+wtd_mcp2 <- subset(wtd_nona, well %in% "MCP-2")
+wtd_mcp3 <- subset(wtd_nona, well %in% "MCP-3")
+wtd_mcp4 <- subset(wtd_nona, well %in% "MCP-4")
+wtd_mcp5 <- subset(wtd_nona, well %in% "MCP-5")
+
+# MCT2 - not sure if I need to separate by depth; maybe just average?
+wtd_mct1s <- subset(wtd_nona, well %in% "MCT2-1-S")
+wtd_mct1m <- subset(wtd_nona, well %in% "MCT2-1-M")
+wtd_mct1d <- subset(wtd_nona, well %in% "MCT2-1-D")
+
+wtd_mct2s <- subset(wtd_nona, well %in% "MCT2-2-S")
+wtd_mct2m <- subset(wtd_nona, well %in% "MCT2-2-M")
+wtd_mct2d <- subset(wtd_nona, well %in% "MCT2-2-D")
+
+wtd_mct3s <- subset(wtd_nona, well %in% "MCT2-3-S")
+wtd_mct3m <- subset(wtd_nona, well %in% "MCT2-3-M")
+wtd_mct3d <- subset(wtd_nona, well %in% "MCT2-3-D")
+
+wtd_mct4s <- subset(wtd_nona, well %in% "MCT2-4-S")
+wtd_mct4m <- subset(wtd_nona, well %in% "MCT2-4-M")
+wtd_mct4d <- subset(wtd_nona, well %in% "MCT2-4-D")
+
+```
+
+
+## Linear interpolations (for now just using deep wells at MCT2; in future maybe average the depths)
+```{r}
+date <- seq(from=as.Date("2018-05-31"), to=as.Date("2018-08-09"), by="day")
+#date <- as.character(date)
+water_level_bgs_cm <- vector(mode = "character", length = 71)
+high.freq <- data.frame(date, water_level_bgs_cm)
+# Create high-frequency zoo object
+zh <- zoo(high.freq$water_level_bgs_cm, high.freq$date) # high freq
+
+# MCP-1
+# Create zoo objects
+zl <- zoo(wtd_mcp1$water_level_bgs_cm, wtd_mcp1$date) #low freq
+# Merge series into one object
+z <- merge(zl, zh)
+# Interpolate water table data (na.spline could also be used)
+z$zl <- na.approx(z$zl, rule=2)
+# Make back into dataframe
+mcp1_interp <- fortify.zoo(z)
+# test plot
+ggplot(mcp1_interp) +
+  aes(x=Index, y=zl) +
+  geom_point()
+
+# MCP-2
+zl <- zoo(wtd_mcp2$water_level_bgs_cm, wtd_mcp2$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mcp2_interp <- fortify.zoo(z)
+
+# MCP-3
+zl <- zoo(wtd_mcp3$water_level_bgs_cm, wtd_mcp3$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mcp3_interp <- fortify.zoo(z)
+
+# MCP-4
+zl <- zoo(wtd_mcp4$water_level_bgs_cm, wtd_mcp4$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mcp4_interp <- fortify.zoo(z)
+
+# MCP-5
+zl <- zoo(wtd_mcp5$water_level_bgs_cm, wtd_mcp5$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mcp5_interp <- fortify.zoo(z)
+
+
+# MCT2-1-D
+zl <- zoo(wtd_mct1d$water_level_bgs_cm, wtd_mct1d$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mct1d_interp <- fortify.zoo(z)
+
+# MCT2-2-D
+zl <- zoo(wtd_mct2d$water_level_bgs_cm, wtd_mct2d$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mct2d_interp <- fortify.zoo(z)
+
+# MCT2-3-D
+zl <- zoo(wtd_mct3d$water_level_bgs_cm, wtd_mct3d$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mct3d_interp <- fortify.zoo(z)
+
+# MCT2-4-D
+zl <- zoo(wtd_mct4d$water_level_bgs_cm, wtd_mct4d$date) #low freq
+z <- merge(zl, zh)
+z$zl <- na.approx(z$zl, rule=2)
+mct4d_interp <- fortify.zoo(z)
+
+```
+
+## Merge data frames into one
+```{r}
+colnames(mct1d_interp) <- c("date", "wtd_cm", "zh")
+mct1d_interp$Location <- "MCT2-1"
+
+colnames(mct2d_interp) <- c("date", "wtd_cm", "zh")
+mct2d_interp$Location <- "MCT2-2"
+
+colnames(mct3d_interp) <- c("date", "wtd_cm", "zh")
+mct3d_interp$Location <- "MCT2-3"
+
+colnames(mct4d_interp) <- c("date", "wtd_cm", "zh")
+mct4d_interp$Location <- "MCT2-4"
+
+
+# Rbind the four data frames together
+wtd_interp <- rbind(mct1d_interp, mct2d_interp)
+wtd_interp <- rbind(wtd_interp, mct3d_interp)
+wtd_interp <- rbind(wtd_interp, mct4d_interp)
+
+```
