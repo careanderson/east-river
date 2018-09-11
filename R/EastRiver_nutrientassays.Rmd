@@ -1,0 +1,336 @@
+---
+title: "EastRiver_nutrientassays"
+author: "CGA"
+date: "March 6, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## 1. Load spreadsheets with nutrient data
+```{r}
+amm1 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_ammonium.xlsx", na="NA")[c(1:8), c(2:13)]))
+amm2 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_ammonium.xlsx", na="NA")[c(11:18), c(2:13)]))
+amm3 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_ammonium.xlsx", na="NA")[c(21:28), c(2:13)]))
+
+nit1 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_nitrate.xlsx", na="NA")[c(1:8), c(2:13)]))
+nit2 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_nitrate.xlsx", na="NA")[c(11:18), c(2:13)]))
+nit3 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_nitrate.xlsx", na="NA")[c(21:28), c(2:13)]))
+
+phos1 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_phosphate.xlsx", na="NA")[c(1:8), c(2:13)]))
+phos2 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_phosphate.xlsx", na="NA")[c(11:18), c(2:13)]))
+phos3 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/14May2018_phosphate.xlsx", na="NA")[c(31:38), c(2:13)])) # fixed because of sampling mix-up
+
+template_1 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/template.xlsx", col_names = FALSE, na="NA")[c(1:8), c(1:12)]))
+template_2 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/template.xlsx", col_names = FALSE, na="NA")[c(11:18), c(1:12)]))
+template_3 <- as.vector(as.matrix(read_excel("Data/Nutrient_Assays/template.xlsx", col_names = FALSE, na="NA")[c(21:28), c(1:12)]))
+
+```
+
+## 2. Match up plates and templates, extract standards, make standard curve
+```{r}
+amm1_match <- data.frame(cbind(template_1, amm1))
+amm2_match <- data.frame(cbind(template_2, amm2))
+amm3_match <- data.frame(cbind(template_3, amm3))
+colnames(amm1_match) <- c("sample", "abs")
+colnames(amm2_match) <- c("sample", "abs")
+colnames(amm3_match) <- c("sample", "abs")
+amm_all <- rbind(amm1_match, amm2_match, amm3_match)
+amm_all$abs <- as.numeric(as.character(amm_all$abs))
+
+nit1_match <- data.frame(cbind(template_1, nit1))
+nit2_match <- data.frame(cbind(template_2, nit2))
+nit3_match <- data.frame(cbind(template_3, nit3))
+colnames(nit1_match) <- c("sample", "abs")
+colnames(nit2_match) <- c("sample", "abs")
+colnames(nit3_match) <- c("sample", "abs")
+nit_all <- rbind(nit1_match, nit2_match, nit3_match)
+nit_all$abs <- as.numeric(as.character(nit_all$abs))
+
+phos1_match <- data.frame(cbind(template_1, phos1))
+phos2_match <- data.frame(cbind(template_2, phos2))
+phos3_match <- data.frame(cbind(template_3, phos3))
+colnames(phos1_match) <- c("sample", "abs")
+colnames(phos2_match) <- c("sample", "abs")
+colnames(phos3_match) <- c("sample", "abs")
+phos_all <- rbind(phos1_match, phos2_match, phos3_match)
+phos_all$abs <- as.numeric(as.character(phos_all$abs))
+
+# Standard list
+stand <- c("std_1", "std_2", "std_3", "std_4", "std_5", "std_6", "std_7", "std_8")
+
+# Take out standards
+nit_stand_df <- nit_all[grep("std", nit_all$sample), ]
+nit_stand <- data.frame(stand, c(0, 0.15, 0.3125, 0.625, 2.5, 5, NA, NA))
+colnames(nit_stand) <- c("sample", "stand_conc")
+nit_stand_df <- merge(nit_stand_df, nit_stand)
+
+amm_stand_df <- amm_all[grep("std", amm_all$sample), ]
+amm_stand <- data.frame(stand, c(0, 0.5, 1, 2, 5, 7, 10, 20))
+colnames(amm_stand) <- c("sample", "stand_conc")
+amm_stand_df <- merge(amm_stand_df, amm_stand)
+
+phos_stand_df <- phos_all[grep("std", phos_all$sample), ]
+phos_stand <- data.frame(stand, c(0, 1, 2, 5, 10, 25, NA, NA))
+colnames(phos_stand) <- c("sample", "stand_conc")
+phos_stand_df <- merge(phos_stand_df, phos_stand)
+
+# Graph and find equations
+plot(nit_stand_df$stand_conc, nit_stand_df$abs)
+nit_model <- lm(abs ~ stand_conc, data=nit_stand_df[c(3:12),])
+abline(nit_model, col = "red")
+summary(nit_model)
+coef(nit_model) # b=0.1433890, m=0.2351738 
+
+plot(amm_stand_df$stand_conc, amm_stand_df$abs)
+amm_model <- lm(abs ~ stand_conc, data=amm_stand_df[c(3:12),])
+abline(amm_model, col = "red")
+summary(amm_model)
+coef(amm_model) # b=0.083951923, m=0.009596154 
+
+plot(phos_stand_df$stand_conc, phos_stand_df$abs)
+phos_model <- lm(abs ~ stand_conc, data=phos_stand_df[c(3:14),])
+abline(phos_model, col = "red")
+summary(phos_model)
+coef(phos_model) # b=0.05399663, m=0.01163993 
+
+# Subtract blanks for each nutrient, for each extraction
+amm_blanks <- amm_all[grep("blank", amm_all$sample), ]
+amm_blanks_av <- aggregate(abs~sample, amm_blanks, mean)
+
+nit_blanks <- nit_all[grep("blank", nit_all$sample), ]
+nit_blanks_av <- aggregate(abs~sample, nit_blanks, mean)
+
+phos_blanks <- phos_all[grep("blank", phos_all$sample), ]
+phos_blanks_av <- aggregate(abs~sample, phos_blanks, mean)
+
+# Separate sample into ID and extraction
+nit_all <- nit_all %>%
+  separate(sample, c("ID", "extraction"), "-")
+amm_all <- amm_all %>%
+  separate(sample, c("ID", "extraction"), "-")
+phos_all <- phos_all %>%
+  separate(sample, c("ID", "extraction"), "-")
+
+# Remove NAs
+nit_all <- nit_all[complete.cases(nit_all), ]
+amm_all <- amm_all[complete.cases(amm_all), ]
+phos_all <- phos_all[complete.cases(phos_all), ]
+
+# Only the samples
+nit_all <- nit_all[!grepl("blank", nit_all$ID), ]
+amm_all <- amm_all[!grepl("blank", amm_all$ID), ]
+phos_all <- phos_all[!grepl("blank", phos_all$ID), ]
+
+# Average duplicates
+nit_means <- aggregate(abs~ID+extraction, nit_all, mean)
+amm_means <- aggregate(abs~ID+extraction, amm_all, mean)
+phos_means <- aggregate(abs~ID+extraction, phos_all, mean)
+
+# Subtract blanks
+nit_means$abs_corr <- -999
+nit_means$abs_corr[nit_means$extraction=="h2o"] <- nit_means$abs[nit_means$extraction=="h2o"] - 0.1030
+nit_means$abs_corr[nit_means$extraction=="dith"] <- nit_means$abs[nit_means$extraction=="dith"] - 0.5225
+nit_means$abs_corr[nit_means$extraction=="hcl"] <- nit_means$abs[nit_means$extraction=="hcl"] - 0.1020
+nit_means$abs_corr[nit_means$extraction=="pp"] <- nit_means$abs[nit_means$extraction=="pp"] - 0.0645
+# Nitrate:
+#water_blank: 0.1030
+#dith_blank: 0.5225
+#hcl_blank: 0.1020
+#pp_blank: 0.0645
+
+
+amm_means$abs_corr <- -999
+amm_means$abs_corr[amm_means$extraction=="h2o"] <- amm_means$abs[amm_means$extraction=="h2o"] - 0.0730
+amm_means$abs_corr[amm_means$extraction=="dith"] <- amm_means$abs[amm_means$extraction=="dith"] - 0.0520
+amm_means$abs_corr[amm_means$extraction=="hcl"] <- amm_means$abs[amm_means$extraction=="hcl"] - 1.0070
+amm_means$abs_corr[amm_means$extraction=="pp"] <- amm_means$abs[amm_means$extraction=="pp"] - 0.0615
+# Ammonium:
+#water_blank: 0.0730
+#dith_blank: 0.0520
+#hcl_blank: 1.0070
+#pp_blank: 0.0615
+
+
+phos_means$abs_corr <- -999
+phos_means$abs_corr[phos_means$extraction=="h2o"] <- phos_means$abs[phos_means$extraction=="h2o"] - 0.0580
+phos_means$abs_corr[phos_means$extraction=="dith"] <- phos_means$abs[phos_means$extraction=="dith"] - 0.6270
+phos_means$abs_corr[phos_means$extraction=="hcl"] <- phos_means$abs[phos_means$extraction=="hcl"] - 0.0620
+phos_means$abs_corr[phos_means$extraction=="pp"] <- phos_means$abs[phos_means$extraction=="pp"] - 0.0570
+# Phosphate:
+#water_blank: 0.0580
+#dith_blank: 0.6270
+#hcl_blank: 0.0620
+#pp_blank: 0.0570
+
+
+# Use standard equation to convert numbers
+nit_means$conc <- (nit_means$abs_corr - 0.1433890) / 0.2351738
+amm_means$conc <- (amm_means$abs_corr - 0.083951923) / 0.009596154
+phos_means$conc <- (phos_means$abs_corr - 0.05399663) / 0.01163993
+
+```
+
+
+## 2. Correct for soil amount and dilutions
+```{r}
+
+# Convert negatives to zeros
+nit_means$conc[nit_means$conc < 0] <- 0
+amm_means$conc[amm_means$conc < 0] <- 0
+phos_means$conc[phos_means$conc < 0] <- 0
+
+
+# Correct for sample amount, dilutions, etc.
+# With the molar mass for ammonium (18 g/mol) and nitrogen (14) you should be able to convert to mmol as follows
+#(x NH4)(mg L-1)*(1/18.039) ((mmol mg-1)-1) = x mmol NH4 L-1, which is the same as mmol NH4-N L-1
+#(x TN)(mg L-1)*(1/14.0067) ((mmol mg-1)-1) = x mmol TN L-1
+
+# Nitrate in uM; convert to mmol/g (1um = 0.001mm)
+nit_means$conc_corr <- nit_means$conc * (0.01/0.33) * (0.001) #no dilution for any of the extractions
+
+# Ammonium in ppm; need to convert to mmol/g
+amm_means$conc_corr[amm_means$extraction=="h2o"] <- amm_means$conc[amm_means$extraction=="h2o"] * (0.01/0.33) * (1/18.039)  #no dilution
+amm_means$conc_corr[amm_means$extraction=="pp"] <- amm_means$conc[amm_means$extraction=="pp"] * (0.01/0.33)  * (1/18.039)  #no dilution
+amm_means$conc_corr[amm_means$extraction=="dith"] <- amm_means$conc[amm_means$extraction=="dith"] * (0.01/0.33) * 10 * (1/18.039) #1:10 dilution
+amm_means$conc_corr[amm_means$extraction=="hcl"] <- amm_means$conc[amm_means$extraction=="hcl"] * (0.01/0.33) * (1/18.039) #no dilution
+
+# Phosphate in uM; convert to mmol/g (1um = 0.001mm)
+phos_means$conc_corr[phos_means$extraction=="h2o"] <- phos_means$conc[phos_means$extraction=="h2o"] * (0.01/0.33) * (0.001) #no dilution
+phos_means$conc_corr[phos_means$extraction=="pp"] <- phos_means$conc[phos_means$extraction=="pp"] * (0.01/0.33) * (0.001) #no dilution
+phos_means$conc_corr[phos_means$extraction=="dith"] <- phos_means$conc[phos_means$extraction=="dith"] * (0.01/0.33) * (0.001) * 100 #1:100 dilution
+phos_means$conc_corr[phos_means$extraction=="hcl"] <- phos_means$conc[phos_means$extraction=="hcl"] * (0.01/0.33) * (0.001) * 10 #1:10 dilution
+
+
+# Merge with sample key
+# Read in the sample key file
+sample_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
+
+# Separate the "sample" column into two separate columns (location, rep)
+sample_key <- sample_key %>%
+  separate(sample, c("location", "rep"), "-")
+
+# Separate the "depth_cm" column into two separate columns (top_cm, btm_cm)
+sample_key <- sample_key %>%
+  separate(depth_cm, c("top_cm", "btm_cm"), "-")
+
+# Convert the soil depths to numeric, so R treats them as numbers (and not characters).
+sample_key$top_cm <- as.numeric(sample_key$top_cm)
+sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
+
+# Merge the MP-ICP-AES data with the sample key, using the common column "ID".
+nit_all_merge <- merge(nit_means, sample_key, by="ID")
+amm_all_merge <- merge(amm_means, sample_key, by="ID")
+phos_all_merge <- merge(phos_means, sample_key, by="ID")
+
+```
+
+
+## Sum ammonium and nitrate (total inorganic N), subtract from TN to get TON
+```{r}
+# Units mmol/g
+colnames(nit_all_merge)[c(3:6)] <- c("nit_abs", "nit_abs_corr", "nit_conc","nit_conc_corr")
+colnames(amm_all_merge)[c(3:6)] <- c("amm_abs", "amm_abs_corr", "amm_conc","amm_conc_corr")
+
+inorgN_all_merge <- merge(nit_all_merge, amm_all_merge)
+inorgN_all_merge$inorgN_sum <- -999
+inorgN_all_merge$inorgN_sum <- inorgN_all_merge$nit_conc_corr + inorgN_all_merge$amm_conc_corr
+
+all_n_merge <- merge(inorgN_all_merge, TN_samples, by=c("ID", "extraction"))
+
+all_n_merge$TON <- -999
+all_n_merge$TON <- all_n_merge$mol_n_per_g - all_n_merge$inorgN_sum
+
+# Plot of TON vs. soil depth, by extraction
+ggplot(all_n_merge) +
+  aes(x=top_cm, y=TON) +
+  geom_point() +
+  facet_wrap(~extraction, scales="free")
+colnames(all_n_merge)
+
+# Depth_category
+all_n_merge$depth_category <- -999 #initiate a column for "depth_class"
+all_n_merge$depth_category <- ifelse(all_n_merge$top_cm < 40, "shallow", ifelse(all_n_merge$top_cm > 90, "deep", "subsurface"))
+
+# Make "depth_category" a factor, and order the depth classes
+all_n_merge$depth_category <- factor(all_n_merge$depth_category, levels = c("shallow", "subsurface", "deep"))
+
+# Melt data
+n_melt <- melt(all_n_merge, id=c("ID", "extraction", "location", "rep", "top_cm", "btm_cm", "dilution_tn", "depth_category"))
+
+# Change labels of sequential extractions
+n_melt$extraction2 <- factor(n_melt$extraction, levels = c("dith", "hcl", "pp", "h2o"))
+levels(n_melt$extraction2) <- c("Dithionite",  "HCl", "Pyrophosphate", "Water")
+
+# Make figure for TON vs. TIN; bar plot like ICR data
+# Stacked bar plots
+n1 <- ggplot(subset(n_melt, depth_category %in% "shallow" & variable %in% c("mol_n_per_g", "TON"))) +
+  aes(y=value, x=extraction2, fill=variable) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("Shallow") + ylab("") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title=element_text(size=30),
+        legend.text=element_text(size=30),
+        axis.text.y = element_text(angle = 60, vjust = 0.5, hjust=0.85)) +
+    scale_fill_manual(name="",
+                      breaks=c("TON", "mol_n_per_g"),
+                      labels=c("Organic", "Inorganic"),
+                      values=c("black","#0072B2"))
+
+n2 <- ggplot(subset(n_melt, depth_category %in% "subsurface" & variable %in% c("mol_n_per_g", "TON"))) +
+  aes(y=value, x=extraction2, fill=variable) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("Subsurface") + ylab(expression(Nitrogen~(mmol~g^-1))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title=element_text(size=30),
+        legend.text=element_text(size=30),
+        axis.text.y = element_text(angle = 60, vjust = 0.5, hjust=0.85)) +
+    scale_fill_manual(name="",
+                      breaks=c("TON", "mol_n_per_g"),
+                      labels=c("Organic", "Inorganic"),
+                      values=c("black","#0072B2"))
+
+#Plot together with shared legend
+ggarrange(n1, n2, ncol=1, nrow=2, common.legend = TRUE, legend="right")
+```
+
+
+## Plots
+```{r}
+ggplot(nit_all_merge) +
+  aes(x=top_cm, y=nit_conc_corr) +
+  geom_point() +
+  ylab("nitrate (uM/g soil)") +
+  facet_wrap(~extraction, scales = "free")
+
+ggplot(amm_all_merge) +
+  aes(x=top_cm, y=amm_conc_corr) +
+  geom_point() +
+  ylab("ammonium (mg/L/g soil)") +
+  facet_wrap(~extraction, scales = "free")
+
+ggplot(phos_all_merge) +
+  aes(x=top_cm, y=conc_corr) +
+  geom_point() +
+  ylab("phosphate (uM/g soil)") +
+  facet_wrap(~extraction, scales = "free")
+```
