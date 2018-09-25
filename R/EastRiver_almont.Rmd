@@ -65,6 +65,16 @@ ggplot(discharge) +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
+# For website:
+ggplot(discharge[which(discharge$datetime > "2018-05-09 12:00:00"), ])  +
+  geom_line(aes(x=datetime, y=gageheight_ft), color="blue", size=1) +
+#  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
+  xlab("") + ylab("East River height (ft)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 22),
+        axis.title = element_text(size = 22),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
 
 # overlay discharge?
 

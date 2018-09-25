@@ -74,27 +74,13 @@ flux$datetime <- as.POSIXct(paste(flux$Date, flux$Time), format="%m/%d/%Y %H:%M"
 # Flux average (To do: exclude outliers based on SD)
 flux$flux.av <- rowMeans(flux[, c(7,8,9)], na.rm = TRUE)
 
-# Initial figures
-ggplot(flux) +
-  aes(x=datetime, y=flux.av) +
-  geom_point() +
-  facet_wrap(~Location)
-
-ggplot(flux) +
-  aes(x=Moisture, y=flux.av, color=Location) +
-  geom_point()
-
-ggplot(flux) +
-  aes(x=temp_C, y=flux.av, color=Location) +
-  geom_point()
-
 # Merge flux with licor key
 colnames(licor_key)[2] <- "collar"
 flux_total <- merge(flux, licor_key)
 
-# MCT2-1 for presentation
-ggplot(subset(flux_total, Location == "MCT2-1")) +
-  aes(x=datetime, y=flux.av) +
+# Figures
+ggplot(flux_total) +
+  aes(x=datetime, y=flux.av) + #, color=Environment
   geom_point() +
   geom_smooth() +
   xlab("Date") + ylab("Soil respiration (CO2 flux)") +
@@ -102,7 +88,8 @@ ggplot(subset(flux_total, Location == "MCT2-1")) +
   theme(axis.text = element_text(size = 15),
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~Location, scales="free")
 
 ggplot(flux_total) +
   aes(x=temp_C, y=flux.av) + #, color=Environment
@@ -129,19 +116,6 @@ ggplot(flux_total) +
         panel.grid.minor = element_blank()) +
   guides(color=guide_legend(title="Vegetation type")) +
   facet_wrap(~Location, scales="free")
-
-ggplot(subset(flux_total, flux.av < 5)) +
-  aes(x=datetime, y=flux.av, color=Moisture) +
-  geom_point() +
-  geom_smooth() +
-  xlab("Date") + ylab("Soil respiration (CO2 flux)") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()) +
-#  guides(color=guide_legend(title="Vegetation type")) +
-  facet_wrap(~Location)
 
 ggplot(subset(flux_total)) +
   aes(x=as.POSIXct(Time, format= "%H:%M"), y=flux.av, color=as.POSIXct(Time, format= "%H:%M")) +
@@ -208,7 +182,7 @@ ggplot(redox_total) +
   aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
   geom_point() +
   geom_smooth() +
-  xlab("Date") + ylab("Redox, corrected (mV)") +
+  xlab("Date") + ylab("Eh (mV)") +
   theme_bw() +
   theme(axis.text = element_text(size = 15),
         axis.title = element_text(size = 15),
@@ -268,21 +242,80 @@ ggplot(subset(flux_redox, depth_cm == 100)) +
   facet_wrap(~depth_cm + Location, scales="free")
 ```
 
-## Flux and water table depth
+## Flux, redox, and water table depth
 ```{r}
 # First, run EastRiver_watertabledepth.Rmd to get processed water table depth data
 
-# Merge flux_total with wtd_interp
+# Merge flux_total or flux_redox with wtd_interp
 flux_total$date <- as.Date(flux_total$datetime)
+flux_redox$date <- as.Date(flux_redox$datetime)
 
+flux_watertable <- merge(flux_redox, wtd_interp) # was some data lost in the merge?
 
-flux_watertable <- merge(flux_total, wtd_interp) # was some data lost in the merge?
+flux_watertable$date <- xtfrm(flux_watertable$date)
 
 # Prelim figures
-ggplot(flux_watertable) +
+ggplot(subset(flux_watertable, depth_cm %in% 15)) +
+  aes(x=datetime, y=flux.av) + #, color=Environment
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~Location, scales="free")
+
+ggplot(subset(flux_watertable, depth_cm %in% 15)) +
+  aes(x=Moisture, y=flux.av, color=date) + #, color=Environment
+  geom_point() +
+  geom_smooth() +
+  xlab("Soil moisture (volumetric)") + ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+ # scale_color_continuous(trans = 'reverse') +
+  guides(color=guide_legend(title="Date")) +
+  facet_wrap(~Location)
+
+ggplot(subset(flux_watertable, depth_cm %in% 15)) +
+  aes(x=datetime, y=wtd_cm) + #, color=Environment
+  scale_y_reverse() +
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("Water table depth (cm)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~Location)
+
+ggplot(subset(flux_watertable, depth_cm %in% 15)) +
   aes(x=wtd_cm, y=Moisture) +
   geom_point() +
   geom_smooth() +
+  xlab("Water table depth (cm)") + ylab("Soil moisture (volumetric)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  facet_wrap(~Location, scales="free")
+
+ggplot(flux_watertable) +
+  aes(x=wtd_cm, y=redox_av.corrected, color=depth_cm) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Water table depth (cm)") + ylab("Redox potential (mV)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
   facet_wrap(~Location, scales="free")
 
 ```

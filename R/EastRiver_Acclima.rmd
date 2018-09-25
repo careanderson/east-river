@@ -51,17 +51,19 @@ mc1$location <- "MCT2-1"
 
 ## Name soil depths, rbind all
 ```{r}
-mc4$depth <- -999
-mc4$depth <- ifelse(mc4$sensor %in% c(9000094, 9000101), "surface",
-                    ifelse(mc4$sensor %in% c(9000218, 9000128), "mid_30cm", "deep_70cm"))
+# initially, labeled: surface, mid_30cm, deep_70cm
 
-mc3$depth <- -999
-mc3$depth <- ifelse(mc3$sensor %in% c(9000013, 9000109), "surface",
-                    ifelse(mc3$sensor %in% c(9000028, 9000230), "mid_30cm", "deep_70cm"))
+mc4$depth_cm <- -999
+mc4$depth_cm <- ifelse(mc4$sensor %in% c(9000094, 9000101), "15",
+                    ifelse(mc4$sensor %in% c(9000218, 9000128), "30", "70"))
 
-mc1$depth <- -999
-mc1$depth <- ifelse(mc1$sensor %in% c(9000014, 9000176), "surface",
-                    ifelse(mc1$sensor %in% c(9000170, 9000180), "mid_30cm", "deep_70cm"))
+mc3$depth_cm <- -999
+mc3$depth_cm <- ifelse(mc3$sensor %in% c(9000013, 9000109), "15",
+                    ifelse(mc3$sensor %in% c(9000028, 9000230), "30", "70"))
+
+mc1$depth_cm <- -999
+mc1$depth_cm <- ifelse(mc1$sensor %in% c(9000014, 9000176), "15",
+                    ifelse(mc1$sensor %in% c(9000170, 9000180), "30", "70"))
 
 acclima_total <- rbind(mc1, mc3, mc4)
 ```
@@ -70,7 +72,7 @@ acclima_total <- rbind(mc1, mc3, mc4)
 ## Plots (moisture/temp)
 ```{r}
 ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth) +
+  aes(x=time, y=temperature, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature") +
   theme_bw() +
@@ -81,10 +83,10 @@ ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
   facet_wrap(~location) +
   guides(color=guide_legend(title="Sensor depth (cm)"))
 
-ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth) +
+ggplot(acclima_total[which(acclima_total$time > "2018-05-26 12:00:00"), ]) +
+  aes(x=time, y=moisture, color=depth_cm) +
   geom_point(size = 1) +
-  xlab("time") + ylab("moisture") + ggtitle("Soil moisture") +
+  xlab("Time") + ylab("Soil moisture (volumetric)") + #+ ggtitle("Soil moisture") +
   theme_bw() +
   theme(axis.text = element_text(size = 15),
         axis.title = element_text(size = 15),
@@ -94,7 +96,7 @@ ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
   guides(color=guide_legend(title="Sensor depth (cm)"))
 
 ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
-  aes(x=time, y=conductivity, color=depth) +
+  aes(x=time, y=conductivity, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("conductivity") + ggtitle("Soil conductivity") +
   theme_bw() +
@@ -108,7 +110,7 @@ ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
 
 # MC1
 g1 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth) +
+  aes(x=time, y=temperature, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-1") +
   theme_bw() +
@@ -118,7 +120,7 @@ g1 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
         panel.grid.minor = element_blank())
 
 g2 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth) +
+  aes(x=time, y=moisture, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-1") +
   theme_bw() +
@@ -129,7 +131,7 @@ g2 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
 
 # MC3
 g3 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth) +
+  aes(x=time, y=temperature, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-3") +
   theme_bw() +
@@ -139,7 +141,7 @@ g3 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
         panel.grid.minor = element_blank())
 
 g4 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth) +
+  aes(x=time, y=moisture, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-3") +
   theme_bw() +
@@ -150,7 +152,7 @@ g4 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
 
 # MC4
 g5 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth) +
+  aes(x=time, y=temperature, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-4") +
   theme_bw() +
@@ -160,7 +162,7 @@ g5 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
         panel.grid.minor = element_blank())
 
 g6 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth) +
+  aes(x=time, y=moisture, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-4") +
   theme_bw() +

@@ -134,10 +134,14 @@ z$zl <- na.approx(z$zl, rule=2)
 mct3d_interp <- fortify.zoo(z)
 
 # MCT2-4-D
-zl <- zoo(wtd_mct4d$water_level_bgs_cm, wtd_mct4d$date) #low freq
+## Plotting mct4d_interp shows outlier from 6/29/18. For now, remove this and reinterpolate.
+wtd_mct4d_nojune29 <- wtd_mct4d[-8, ]
+zl <- zoo(wtd_mct4d_nojune29$water_level_bgs_cm, wtd_mct4d_nojune29$date) #low freq
 z <- merge(zl, zh)
 z$zl <- na.approx(z$zl, rule=2)
 mct4d_interp <- fortify.zoo(z)
+
+
 
 ```
 
