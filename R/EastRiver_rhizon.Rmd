@@ -1,0 +1,131 @@
+---
+title: "EastRiver_rhizon"
+author: "CGA"
+date: "November 1, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+```
+
+## Load files, separate gas data into separate files
+```{r, echo=FALSE}
+rhizon_weight <- read_excel("Data/EastRiver_rhizons/MCT2_rhizon_vial_weights.xlsx")
+rhizon_gas <- read_excel("Data/EastRiver_rhizons/MCT2_rhizon_co2_summer2018.xlsx")
+
+# Gas data separated by unique file names
+unique(rhizon_gas$filename)
+gas1 <- subset(rhizon_gas, filename=="CA10182018_b")
+gas2 <- subset(rhizon_gas, filename=="CA10232018_a")
+gas3 <- subset(rhizon_gas, filename=="CA10242018_a")
+gas4 <- subset(rhizon_gas, filename=="CA10242018_b")
+gas5 <- subset(rhizon_gas, filename=="CA10242018_c")
+gas6 <- subset(rhizon_gas, filename=="CA10252018_a")
+gas7 <- subset(rhizon_gas, filename=="CA10252018_b")
+gas8 <- subset(rhizon_gas, filename=="CA10252018_c")
+gas9 <- subset(rhizon_gas, filename=="CA10312018_a")
+```
+
+## Standard curves and convert area to concentration
+```{r, echo=FALSE}
+
+## Make standard curves for each data file, convert area to concentration in main file.
+
+#gas1
+gas1_std <- gas1[c(1:3), ]
+gas1_std$mct2_position_or_standard <- as.numeric(gas1_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas1_std$mct2_position_or_standard, gas1_std$area) #plot
+gas1_lm <- lm(area ~ mct2_position_or_standard, data=gas1_std)
+abline(gas1_lm, col="red")
+summary(gas1_lm)
+coef(gas1_lm) #b=0.94712978, m=0.03382774
+
+gas1$conc <- (gas1$area - 0.94712978) / 0.03382774
+
+
+#gas2
+gas2_std <- gas2[c(1:3), ]
+gas2_std$mct2_position_or_standard <- as.numeric(gas2_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas2_std$mct2_position_or_standard, gas2_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas2_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas2_std)) #b=-2.34870285, m=0.03420157
+
+gas2$conc <- (gas2$area - -2.34870285) / 0.03420157
+
+
+#gas3
+gas3_std <- gas3[c(1:3), ]
+gas3_std$mct2_position_or_standard <- as.numeric(gas3_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas3_std$mct2_position_or_standard, gas3_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas3_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas3_std)) #b=-5.60406984, m=0.03595289
+
+gas3$conc <- (gas3$area - -5.60406984) / 0.03595289
+
+
+#gas4
+gas4_std <- gas4[c(1:3), ]
+gas4_std$mct2_position_or_standard <- as.numeric(gas4_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas4_std$mct2_position_or_standard, gas4_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas4_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas4_std)) #b=-1.55119086, m=0.03520806
+
+gas4$conc <- (gas4$area - -1.55119086) / 0.03520806
+
+
+#gas5
+gas5_std <- gas5[c(1:3), ]
+gas5_std$mct2_position_or_standard <- as.numeric(gas5_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas5_std$mct2_position_or_standard, gas5_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas5_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas5_std)) #b=-5.62501624, m=0.03635478
+
+gas5$conc <- (gas5$area - -5.62501624) / 0.03635478
+
+
+#gas6
+gas6_std <- gas6[c(1:3), ]
+gas6_std$mct2_position_or_standard <- as.numeric(gas6_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas6_std$mct2_position_or_standard, gas6_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas6_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas6_std)) #b=-0.14534376, m=0.03513982
+
+gas6$conc <- (gas6$area - -0.14534376) / 0.03513982
+
+
+#gas7
+gas7_std <- gas7[c(1:3), ]
+gas7_std$mct2_position_or_standard <- as.numeric(gas7_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas7_std$mct2_position_or_standard, gas7_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas7_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas7_std)) #b=-8.76704452, m=0.04025636
+
+gas7$conc <- (gas7$area - -8.76704452) / 0.04025636
+
+
+#gas8
+gas8_std <- gas8[c(1:3), ]
+gas8_std$mct2_position_or_standard <- as.numeric(gas8_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas8_std$mct2_position_or_standard, gas8_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas8_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas8_std)) #b=-7.32163591, m=0.04024577
+
+gas8$conc <- (gas8$area - -7.32163591) / 0.04024577
+
+
+#gas9
+gas9_std <- gas9[c(1:3), ]
+gas9_std$mct2_position_or_standard <- as.numeric(gas9_std$mct2_position_or_standard) #convert ppm to numeric
+plot(gas9_std$mct2_position_or_standard, gas9_std$area) #plot
+summary(lm(area ~ mct2_position_or_standard, data=gas9_std))
+coef(lm(area ~ mct2_position_or_standard, data=gas9_std)) #b=-13.49328478, m=0.03723908
+
+gas9$conc <- (gas9$area - 0.94712978) / 0.03382774
+
+
+```
