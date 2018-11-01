@@ -22,9 +22,20 @@ setwd("~/east-river/")
 ```{r}
 # Discharge
 # https://waterdata.usgs.gov/nwis/uv/?site_no=09112500&PARAmeter_cd=00060,00065
-# Measured in cubic feet per second
-discharge <- read_tsv("Data/23July2018_east_river_almont_discharge.txt", skip=28)
-discharge <- discharge[-1, ] #remove first row
+# Measured in cubic feet per second; need from April 1 thru July 1, 2018
+discharge_1 <- read_tsv("Data/EastRiver_discharge/23July2018_east_river_almont_discharge.txt", skip=28)
+discharge_1 <- discharge_1[-1, ] #remove first row
+discharge_1 <- discharge_1[c(1:8832), ] #need from April 1 thru July 1, 2018
+
+
+# updated discharge values; missing through July 1, 2018
+discharge_2 <- read_tsv("Data/EastRiver_discharge/30Oct2018_east_river_almont_discharge.txt", skip=29)
+discharge_2 <- discharge_2[-1, ] #remove first row
+discharge_2 <- discharge_2[c(8833:20402), ] #need from July 2, 2018 thru last date
+
+
+# need to combine so we have the whole dataset
+discharge <- rbind(discharge_1, discharge_2)
 
 ```
 
@@ -49,7 +60,7 @@ discharge$gageheight_ft <- as.numeric((discharge$gageheight_ft))
 ## Plots
 ```{r}
 # Soil sampling dates
-soil_sampling <- c("2018-05-28 00:00:00", "2018-06-08 00:00:00", "2018-06-18 00:00:00", "2018-06-28 00:00:00", "2018-07-23 00:00:00")
+soil_sampling <- c("2018-05-28 00:00:00", "2018-06-08 00:00:00", "2018-06-18 00:00:00", "2018-06-28 00:00:00", "2018-07-23 00:00:00", "2018-09-22 00:00:00")
 soil_sampling <- as.POSIXct(soil_sampling)
 soil_sampling <- data.frame(soil_sampling)
 

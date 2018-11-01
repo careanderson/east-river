@@ -30,7 +30,7 @@ setwd("~/east-river/")
 
 #For the poster, it might be a good starting point to simply average the three replicates and see if the means between the different depths/locations are different.  No stats necessary for now, but some visualization would be great.
 
-icr <- read_excel("Data/CountOutput-Marco Solvent Extration SPE Report May 2018.xlsx", na="NA")
+icr <- read_excel("Data/EMSL/ft_icr_ms/CountOutput-Marco Solvent Extration SPE Report May 2018.xlsx", na="NA")
 
 # Remove "NA" rows
 icr <- icr[complete.cases(icr[,1]), ]

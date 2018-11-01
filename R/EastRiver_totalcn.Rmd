@@ -25,12 +25,18 @@ er_heavy <- read.table("Data/EA_Data/CA_ER_heavy_7Nov2017.txt", sep="\t")
 er_bulk_ed <- read_excel("Data/EA_Data/CA_ER_bulk_6Nov2017_corrected.xlsx")[,-(1:4)]
 er_int <- read.table("Data/EA_Data/CA_ER_int_10Nov2017.txt", sep="\t")
 
+er_redo <- read.table("Data/EA_Data/CA_180920.txt", sep="\t")[-(1:2),] #Mariela re-ran these samples Sept 2018
+
 # Adding column names
 colnames(er_heavy) <- c("full_name", "instrument_name", "sample", "sample_id", "sample_amt", 
   "N_ret_min", "N_resp", "N_wt_mg", "N_wt_pct", "N_peaktype", "N_element_name", "N_C_resp_ratio", 
   "C_ret_min", "C_resp", "C_wt_mg", "C_wt_pct", "C_peaktype", "C_element_name", "C_C_resp_ratio")
 
 colnames(er_int) <- c("full_name", "instrument_name", "sample", "sample_id", "sample_amt", 
+  "N_ret_min", "N_resp", "N_wt_mg", "N_wt_pct", "N_peaktype", "N_element_name", "N_C_resp_ratio", 
+  "C_ret_min", "C_resp", "C_wt_mg", "C_wt_pct", "C_peaktype", "C_element_name", "C_C_resp_ratio")
+
+colnames(er_redo) <- c("full_name", "instrument_name", "sample", "sample_id", "sample_amt", 
   "N_ret_min", "N_resp", "N_wt_mg", "N_wt_pct", "N_peaktype", "N_element_name", "N_C_resp_ratio", 
   "C_ret_min", "C_resp", "C_wt_mg", "C_wt_pct", "C_peaktype", "C_element_name", "C_C_resp_ratio")
 
