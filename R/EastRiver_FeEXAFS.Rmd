@@ -1,0 +1,148 @@
+---
+title: "EastRiver_FeEXAFS"
+author: "CGA"
+date: "August 7, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(reshape2)
+library(ggsci)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load Fe EXAFS file
+```{r}
+feexafs <- read_excel("Data/Fe_EXAFS/ER_Fe_EXAFS_summary_forfigure.xlsx", skip=2)[c(1:5,8),c(2:3,9,11,13,15,17,19,21)]
+
+# B1 - 1 shallow
+# B2 - 1 deep
+# B3 - 2 shallow
+# B4 - 2 deep 
+# B5 - 3 shallow
+# B6b - 3 deep
+```
+
+## Figures
+```{r}
+# I would use the legend descriptions I used for the figure I made and organize them in the same way (i.e. group the Fe oxides together, and have Fe in clay and primary minerals separate).  You can think of it as a spectrum of reactivity.
+
+# Prep for plotting
+feexafs$location <- as.factor(feexafs$location)
+feexafs$depth[feexafs$depth=="deep"] <- "subsurface"
+feexafs$depth <- as.factor(feexafs$depth)
+
+# Melt the data
+feexafs_melt <- melt(feexafs, id=c("location", "depth"))
+
+# To get to 100%
+feexafs_melt$value_per <- feexafs_melt$value * 100
+
+# Change order of Fe minerals (based on Marco's figure) #this is "reverse-ordered" because I flip the axes in ggplot below
+feexafs_melt$variable <- factor(feexafs_melt$variable, levels = c(
+  "PyriteA_weight", 
+  "Biotite_weight", 
+  "Ferrosmectite_weight", 
+  "hematite.avg_weight",
+  "goethite.avg_weight",
+  "a2_line_ferrihydrite.avg_weight",
+  "FeC2O4_weight"))
+
+# Order of depth (shallow, subsurface)
+feexafs_melt$depth <- factor(feexafs_melt$depth, levels = c("subsurface", "shallow"))
+
+# Color-blind palette:
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+ggplot(subset(feexafs_melt, depth %in% c("shallow", "subsurface"))) +
+  aes(y=value_per/100, x=depth, fill=variable) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("") + ylab("") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.text=element_text(size=26),
+        legend.position = 'top', 
+        strip.text.y = element_text(size = 35)) +
+  scale_y_continuous(labels = scales::percent) +
+ scale_fill_manual(name="", breaks = c("FeC2O4_weight", "a2_line_ferrihydrite.avg_weight", "goethite.avg_weight", "hematite.avg_weight", "Ferrosmectite_weight", "Biotite_weight", "PyriteA_weight"), labels = c("Fe(III)-OM", "2-line ferrihydrite", "goethite", "hematite", "ferrosmectite", "biotite", "pyrite"), values=cbbPalette) +
+  facet_grid(location~.)
+```
+
+
+## P XANES
+```{r}
+pxanes <- read_excel("Data/pxanes/P_XANES_summary_min_associated.xlsx")[c(1:6),]
+
+colnames(pxanes)
+colnames(pxanes)[c(1:18)] <- c("sample", "location", "depth_category", "name", "fepo4", "alpo4",
+                               "rna", "dna","phytic_acid","mg3po42","k2hpo4","nah2po4","ca10oh2po4",
+                               "NA","fe_al_phosphate","organicp","mgknaphosphate","caphosphate")
+
+
+pxanes$location <- as.factor(feexafs$location)
+pxanes$depth_category[pxanes$depth_category=="surface"] <- "shallow"
+pxanes$depth_category <- as.factor(pxanes$depth_category)
+
+
+# Sum columns
+#I had grouped them into these four categories you saw on the slide.  But except for org. P, which I would leave as is, I would plot all the other phases individually (i.e. as Fe-PO4, Al-PO4, etc).  Perhaps you could just group them a bit by color, i.e. make  Porg stand out, and have Fe/Al-phosphates as well as the K,Mg, and Na-phosphates look similar. 
+colnames(pxanes)
+pxanes2 <- pxanes[,-c(1,4,7:9,12,14,15,17,18)]
+
+# Prep data
+pxanes_melt <- melt(pxanes2, id=c("location","depth_category"))
+unique(pxanes_melt$variable)
+
+pxanes_melt$value <- as.numeric(as.character(pxanes_melt$value))
+
+# Change order of Fe minerals (based on Marco's figure) #this is "reverse-ordered" because I flip the axes in ggplot below
+pxanes_melt$variable <- factor(pxanes_melt$variable, levels = rev(c(
+  "fepo4",
+  "alpo4",
+  "organicp", 
+  "mg3po42",
+  "k2hpo4",
+  "ca10oh2po4")))
+
+# colors
+#pxanes_colors <- (c("#000099","#0000FF","#D55E00", "#333333", "#666666", "#999999", "#FFCC33"))
+pxanes_colors <- (c("#F0E442","#999999", "#666666", "#D55E00", "#0072B2", "#56B4E9"))
+
+
+# Order of depth (shallow, subsurface)
+pxanes_melt$depth_category <- factor(pxanes_melt$depth_category, levels = c("subsurface", "shallow"))
+
+
+ggplot(subset(pxanes_melt, depth_category %in% c("shallow", "subsurface") &
+                variable %in% c("fepo4", "alpo4", "organicp", "mg3po42","k2hpo4","nah2po4","ca10oh2po4"))) +
+  aes(y=value, x=depth_category, fill=variable) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("") + ylab("") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.text=element_text(size=26),
+        legend.position = 'top', 
+        strip.text.y = element_text(size = 35)) +
+  scale_y_continuous(labels = scales::percent) +
+  facet_grid(location~.) +
+  scale_fill_manual(name="",
+                    breaks=c("fepo4", "alpo4", "organicp", "mg3po42", "k2hpo4", "ca10oh2po4"),
+                    labels=c("Fe-phos", "Al-phos", "Organic P", "Mg-phos", "K-phos", "Ca-phos"),
+                    values=pxanes_colors)
+
+```

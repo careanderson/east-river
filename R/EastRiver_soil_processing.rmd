@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
-setwd("~/east-river/") #set the working directory
+library(readxl)
 ```
 
 ## 1. Read in raw soils data

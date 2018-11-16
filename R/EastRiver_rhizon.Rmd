@@ -11,11 +11,12 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
+library(janitor)
 ```
 
 ## Load files, separate gas data into separate files
 ```{r, echo=FALSE}
-rhizon_weight <- read_excel("Data/EastRiver_rhizons/MCT2_rhizon_vial_weights.xlsx")
+rhizon_weight <- read_excel("Data/EastRiver_rhizons/MCT2_rhizon_vial_weights.xlsx")[,-7]
 rhizon_gas <- read_excel("Data/EastRiver_rhizons/MCT2_rhizon_co2_summer2018.xlsx")
 
 # Gas data separated by unique file names
@@ -28,7 +29,7 @@ gas5 <- subset(rhizon_gas, filename=="CA10242018_c")
 gas6 <- subset(rhizon_gas, filename=="CA10252018_a")
 gas7 <- subset(rhizon_gas, filename=="CA10252018_b")
 gas8 <- subset(rhizon_gas, filename=="CA10252018_c")
-gas9 <- subset(rhizon_gas, filename=="CA10312018_a")
+gas9 <- subset(rhizon_gas, filename=="CA10312018_a") # gas well data
 ```
 
 ## Standard curves and convert area to concentration
@@ -127,5 +128,154 @@ coef(lm(area ~ mct2_position_or_standard, data=gas9_std)) #b=-13.49328478, m=0.0
 
 gas9$conc <- (gas9$area - 0.94712978) / 0.03382774
 
+
+```
+
+
+## Take only the samples, clean up the data
+```{r}
+## Subset only the samples
+gas1 <- subset(gas1, sample_standard %in% "sample")
+gas2 <- subset(gas2, sample_standard %in% "sample")
+gas3 <- subset(gas3, sample_standard %in% "sample")
+gas4 <- subset(gas4, sample_standard %in% "sample")
+gas5 <- subset(gas5, sample_standard %in% "sample")
+gas6 <- subset(gas6, sample_standard %in% "sample")
+gas7 <- subset(gas7, sample_standard %in% "sample")
+gas8 <- subset(gas8, sample_standard %in% "sample")
+gas9 <- subset(gas9, sample_standard %in% "sample")
+
+## Take out the samples that were re-run (on CA10242018_c = 'gas5'; see column in datafile for notes)
+gas5 <- gas5[-c(36:50), ]
+
+## rbind all gas data together  
+gas_total <- rbind(gas1, gas2, gas3, gas4, gas5, gas6, gas7, gas8) #not rbinding gas9, since that is gas well data
+
+## Fill in missing data
+# Convert date from excel numbers to actual dates
+gas_total$date <- as.numeric(gas_total$date)
+gas_total$date <- excel_numeric_to_date(gas_total$date)
+
+# If date blank, then: 5/27/2018
+gas_total$date[is.na(gas_total$date)] <- "2018-05-27"
+
+# Remove irrelevant columns
+colnames(gas_total)
+gas_total <- gas_total[ ,-c(2,7,9,10)]
+
+# Change "surf" to "0-10"
+gas_total$depth_cm[gas_total$depth_cm == "surf"] <- "0-10"
+
+# Change "?" to "2", for MCT2-4, 70-80cm, 6/18/2018
+gas_total$environment[gas_total$environment == "?"] <- "2"
+
+# Change column names
+colnames(gas_total)
+colnames(gas_total)[2] <- "mct2_position"
+
+```
+
+
+## Match up with the vial weights
+```{r}
+# Change rhizon vials column names
+colnames(rhizon_weight) <- c("date", "mct2_position", "environment", "depth_cm", "flask_type", "weight_g")
+
+# Convert date from excel numbers to actual dates
+rhizon_weight$date <- as.numeric(rhizon_weight$date)
+rhizon_weight$date <- excel_numeric_to_date(rhizon_weight$date)
+
+# If date blank, then: 5/27/2018
+rhizon_weight$date[is.na(rhizon_weight$date)] <- "2018-05-27"
+
+# Change to lowercase
+rhizon_weight$environment <- tolower(rhizon_weight$environment)
+
+## Make changes to match gas data nomenclature
+# Change "by river" to "rw"
+rhizon_weight$environment[rhizon_weight$environment == "by river"] <- "rw"
+
+# Change "un" to "2", for MCT2-4, 70-80cm, 6/18/2018
+rhizon_weight$environment[rhizon_weight$environment == "un"] <- "2"
+
+# Change "34-44" to "30-40" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhizon_weight$depth_cm[rhizon_weight$depth_cm == "34-44"] <- "30-40"
+
+# Change "35-45" to "30-40" for MCT2-1, env rw, 6/1/2018 & 6/10/2018
+rhizon_weight$depth_cm[rhizon_weight$depth_cm == "35-45"] <- "30-40"
+
+# Change "63-73" to "60-70" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhizon_weight$depth_cm[rhizon_weight$depth_cm == "63-73"] <- "60-70"
+
+# Change "65-75" to "60-70" for MCT2-4, env 1, 6/1/2018 & 6/10/2018
+rhizon_weight$depth_cm[rhizon_weight$depth_cm == "65-75"] <- "60-70"
+
+# Separate data by position & date to help fill in missing data points
+gas_total1 <- subset(gas_total, mct2_position == 1)
+gas_total3 <- subset(gas_total, mct2_position == 3)
+gas_total4 <- subset(gas_total, mct2_position == 4)
+
+rhizon_weight1 <- subset(rhizon_weight, mct2_position == 1)
+rhizon_weight3 <- subset(rhizon_weight, mct2_position == 3)
+rhizon_weight4 <- subset(rhizon_weight, mct2_position == 4)
+
+
+
+# Test merges
+test1 <- merge(gas_total1, rhizon_weight1)
+test3 <- merge(gas_total3, rhizon_weight3) #120; should be 114 (6 extra)
+test4 <- merge(gas_total4, rhizon_weight4)
+
+# Total merge
+rhizon_total <- rbind(test1, test3, test4)
+
+```
+
+
+## Apply Henry's Law to get concentrations
+```{r}
+# Subtract vial weight from total weight (need square & tapered vial weights)
+mean(22.7482, 22.8133) # tapered mean = 22.7482
+mean(15.9533, 16.0742, 16.1808) # square mean = 15.9533
+
+rhizon_total$flask_g <- ifelse(rhizon_total$flask_type == "tapered", 22.7482, 15.9533)
+
+rhizon_total$water_g <- rhizon_total$weight_g - rhizon_total$flask_g
+
+rhizon_total$water_L <- rhizon_total$water_g * 0.001 #convert g to L; water = 0.001 g/L
+
+# Use Henry's Law
+# Total gas concentration (TC) in the original water sample is calculated by determining the concentration of headspace and converting this to the partial pressure and then solving for the aqueous concentration which partitioned in the gas phase (CAH) and the concentration remaining in the aqueous phase (CA). The total concentration of gas in original sample (TC) is the sum of the concentration partitioned in the gas phase (CAH) and the concentration remaining in the aqueous phase (CA).
+
+# Henry's law states that the mole fraction of a dissolved gas (Xg) is equal to the partial pressure of the gas (pg) at equilibrium divided by Henry's law constant (H). Gas solubility coefficients are used to calculate Henry's law constant.
+
+
+# C = P/KH
+#P is the partial pressure of the gas above the solution.
+#KH is the Henry's law constant for the solution. Given: KH of CO2 in water = 29.41 atm/(mol/L) at 25 °C.
+#C is the concentration of the dissolved gas in solution.
+
+# Given STP. P = 1 atm, T = 298 K (25 C).
+
+# C = 1 atm / 29.41 atm(mol/L) = 0.034 * volume of sample = ___ mol
+
+rhizon_total$water_mol_co2 <- 0.034 * rhizon_total$water_L
+
+# Convert moles to g
+# 1 mole co2 = 44 g
+
+rhizon_total$water_co2_g <- rhizon_total$water_mol_co2 * 44
+
+```
+
+
+## Preliminary figures
+```{r}
+
+ggplot(rhizon_total) +
+  aes(x=date, y=water_mol_co2, color=as.factor(environment)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  facet_wrap(~depth_cm, scales="free")
 
 ```
