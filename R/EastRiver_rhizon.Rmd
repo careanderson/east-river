@@ -244,6 +244,10 @@ rhizon_total$water_g <- rhizon_total$weight_g - rhizon_total$flask_g
 
 rhizon_total$water_L <- rhizon_total$water_g * 0.001 #convert g to L; water = 0.001 g/L
 
+# Take out empty rhizons (NEED TO MATCH UP WITH KEY)
+rhizon_total <- subset(rhizon_total, water_g > 0.15)
+
+
 # Use Henry's Law
 # Total gas concentration (TC) in the original water sample is calculated by determining the concentration of headspace and converting this to the partial pressure and then solving for the aqueous concentration which partitioned in the gas phase (CAH) and the concentration remaining in the aqueous phase (CA). The total concentration of gas in original sample (TC) is the sum of the concentration partitioned in the gas phase (CAH) and the concentration remaining in the aqueous phase (CA).
 
@@ -251,31 +255,35 @@ rhizon_total$water_L <- rhizon_total$water_g * 0.001 #convert g to L; water = 0.
 
 
 # C = P/KH
-#P is the partial pressure of the gas above the solution.
-#KH is the Henry's law constant for the solution. Given: KH of CO2 in water = 29.41 atm/(mol/L) at 25 °C.
+#P is the partial pressure of the gas above the solution (ppm measured directly on li-cor * 10^-6 = atm)
+#KH is the Henry's law constant for the solution. Given: KH of CO2 in water = 29.41 atm/(mol/L) at 25 °C (298 K).
 #C is the concentration of the dissolved gas in solution.
 
-# Given STP. P = 1 atm, T = 298 K (25 C).
+# C = (partial pressure CO2) / 29.41 atm(mol/L)
 
-# C = 1 atm / 29.41 atm(mol/L) = 0.034 * volume of sample = ___ mol
+rhizon_total$water_mol_co2 <- (rhizon_total$conc * 1*10^-6) * rhizon_total$water_L
+rhizon_total$air_mol_co2 <- (rhizon_total$conc * 1*10^-6) * (12 - rhizon_total$water_L)
 
-rhizon_total$water_mol_co2 <- 0.034 * rhizon_total$water_L
+rhizon_total$total_mol_co2 <- rhizon_total$water_mol_co2 + rhizon_total$air_mol_co2
+rhizon_total$doc_aq <- rhizon_total$total_mol_co2 / rhizon_total$water_L
 
-# Convert moles to g
-# 1 mole co2 = 44 g
+# Adding depth classes (surface, mid, deep)
 
-rhizon_total$water_co2_g <- rhizon_total$water_mol_co2 * 44
+rhizon_total$depth_class <- ifelse(rhizon_total$depth_cm == "0-10", "surface",
+                                   ifelse(rhizon_total$depth_cm == "30-40", "30-40",
+                                          ifelse(rhizon_total$depth_cm == "60-70", "60-80",
+                                                 ifelse(rhizon_total$depth_cm == "70-80", "60-80",
+                                                        ifelse(rhizon_total$depth_cm == "80-90", "80-100", "80-100")))))
 
 ```
 
 
 ## Preliminary figures
 ```{r}
-
 ggplot(rhizon_total) +
-  aes(x=date, y=water_mol_co2, color=as.factor(environment)) +
+  aes(x=date, y=doc_aq, color=as.factor(mct2_position)) +
   geom_point() +
-  geom_smooth(method="lm") +
-  facet_wrap(~depth_cm, scales="free")
+#  geom_smooth() +
+  facet_wrap(~depth_class)
 
 ```
