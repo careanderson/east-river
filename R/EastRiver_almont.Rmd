@@ -23,18 +23,16 @@ setwd("~/east-river/")
 # Discharge
 # https://waterdata.usgs.gov/nwis/uv/?site_no=09112500&PARAmeter_cd=00060,00065
 # Measured in cubic feet per second; need from April 1 thru July 1, 2018
-discharge_1 <- read_tsv("Data/EastRiver_discharge/23July2018_east_river_almont_discharge.txt", skip=28)
+discharge_1 <- read.table("Data/EastRiver_discharge/23July2018_east_river_almont_discharge.txt", sep="\t", header=TRUE)
 discharge_1 <- discharge_1[-1, ] #remove first row
 discharge_1 <- discharge_1[c(1:8832), ] #need from April 1 thru July 1, 2018
 
-
 # updated discharge values; missing through July 1, 2018
-discharge_2 <- read_tsv("Data/EastRiver_discharge/30Oct2018_east_river_almont_discharge.txt", skip=29)
+discharge_2 <- read.table("Data/EastRiver_discharge/30Oct2018_east_river_almont_discharge.txt", sep="\t", header=TRUE)
 discharge_2 <- discharge_2[-1, ] #remove first row
 discharge_2 <- discharge_2[c(8833:20402), ] #need from July 2, 2018 thru last date
 
-
-# need to combine so we have the whole dataset
+# Combine for the whole dataset
 discharge <- rbind(discharge_1, discharge_2)
 
 ```
@@ -51,8 +49,8 @@ discharge$datetime <- as.POSIXct(discharge$datetime, format = "%Y-%m-%d %H:%M")
 discharge$date <- as.Date(discharge$datetime, "%Y-%m-%d")
 
 # Change to numeric
-discharge$discharge_cfs <- as.numeric((discharge$discharge_cfs))
-discharge$gageheight_ft <- as.numeric((discharge$gageheight_ft))
+discharge$discharge_cfs <- as.numeric(as.character(discharge$discharge_cfs))
+discharge$gageheight_ft <- as.numeric(as.character(discharge$gageheight_ft))
 
 ```
 
@@ -76,8 +74,7 @@ ggplot(discharge) +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-# For website:
-ggplot(discharge[which(discharge$datetime > "2018-05-09 12:00:00"), ])  +
+ggplot(discharge[which(discharge$datetime > "2018-04-15 12:00:00"), ])  +
   geom_line(aes(x=datetime, y=gageheight_ft), color="blue", size=1) +
 #  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
   xlab("") + ylab("East River height (ft)") +
@@ -85,9 +82,8 @@ ggplot(discharge[which(discharge$datetime > "2018-05-09 12:00:00"), ])  +
   theme(axis.text = element_text(size = 22),
         axis.title = element_text(size = 22),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-# overlay discharge?
-
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B %Y")
 ```
 

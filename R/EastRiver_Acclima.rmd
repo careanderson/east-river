@@ -19,16 +19,13 @@ setwd("~/east-river/")
 
 ## Load and tidy Acclima logger files
 ```{r}
-
 mc4 <- read.csv("Data/acclima_raw/DataSnapExport_090820181200_datasnap3_mc4.csv")
 mc3 <- read.csv("Data/acclima_raw/DataSnapExport_090820181246_datasnap1_mc3.csv")
 mc1 <- read.csv("Data/acclima_raw/DataSnapExport_090820181012_datasnap2_mc1.csv")
 
 # change column names
 colnames(mc4) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
-
 colnames(mc3) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
-
 colnames(mc1) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
 
 # make sensor a factor
@@ -45,7 +42,6 @@ mc1$time <- as.POSIXct(mc1$time, format="%m/%d/%Y %I:%M:%S %p")
 mc4$location <- "MCT2-4"
 mc3$location <- "MCT2-3"
 mc1$location <- "MCT2-1"
-
 ```
 
 
@@ -91,7 +87,8 @@ ggplot(acclima_total[which(acclima_total$time > "2018-05-26 12:00:00"), ]) +
   theme(axis.text = element_text(size = 15),
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()) +
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
   facet_wrap(~location) +
   guides(color=guide_legend(title="Sensor depth (cm)"))
 
