@@ -51,6 +51,7 @@ discharge$date <- as.Date(discharge$datetime, "%Y-%m-%d")
 # Change to numeric
 discharge$discharge_cfs <- as.numeric(as.character(discharge$discharge_cfs))
 discharge$gageheight_ft <- as.numeric(as.character(discharge$gageheight_ft))
+discharge$gageheight_m <- discharge$gageheight_ft * 0.3048
 
 ```
 

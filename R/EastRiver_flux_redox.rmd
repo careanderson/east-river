@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(gridExtra)
+library(grid)
 # Set working directory
 setwd("~/east-river/")
 ```
@@ -31,18 +32,20 @@ read_excel_allsheets <- function(filename) {
     x
 }
 
-mysheets <- read_excel_allsheets('Data/2018_fielddata/9Aug2018_MCT2 Instrumentation and Sampling.xlsx')
+mysheets <- read_excel_allsheets('Data/2018_fielddata/11Dec2018_MCT2 Instrumentation and Sampling.xlsx')
 
 rhizon_key <- as.data.frame(mysheets[1])
-solid_key <- as.data.frame(mysheets[2])
-well_data <- as.data.frame(mysheets[3])
-licor_key <- as.data.frame(mysheets[4])
-flux <- as.data.frame(mysheets[5])
-redox_key <- as.data.frame(mysheets[6])
-redox <- as.data.frame(mysheets[7])
+rhizon_vials <- as.data.frame(mysheets[2])
+solid_key <- as.data.frame(mysheets[3])
+well_data <- as.data.frame(mysheets[4])
+licor_key <- as.data.frame(mysheets[5])
+flux <- as.data.frame(mysheets[6])
+redox_key <- as.data.frame(mysheets[7])
+redox <- as.data.frame(mysheets[8])
 
 # Column names
 names(rhizon_key) <- gsub(pattern = "Rhizon.Probe.Key.", replacement = "", x = names(rhizon_key))
+names(rhizon_vials) <- gsub(pattern = "Rhizon_vials.", replacement= "", x=names(rhizon_vials))
 names(solid_key) <- gsub(pattern = "Solid.Sampling.Key.", replacement = "", x = names(solid_key))
 names(well_data) <- gsub(pattern = "Well.Sampling.Data.", replacement = "", x = names(well_data))
 names(licor_key) <- gsub(pattern = "LI.COR.Key.", replacement = "", x = names(licor_key))
@@ -79,19 +82,22 @@ colnames(licor_key)[2] <- "collar"
 flux_total <- merge(flux, licor_key)
 
 # Figures
-ggplot(flux_total) +
+p1 <- ggplot(subset(flux_total, Location == "MCT2-1")) +
   aes(x=datetime, y=flux.av) + #, color=Environment
   geom_point() +
   geom_smooth() +
-  xlab("Date") + ylab("Soil respiration (CO2 flux)") +
+  #xlab("Date") + ylab("Soil respiration (CO2 flux)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()) +
-  facet_wrap(~Location, scales="free")
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
 
-ggplot(flux_total) +
+ggplot(subset(flux_total, flux.av < 6.7)) +
   aes(x=temp_C, y=flux.av) + #, color=Environment
   geom_point() +
   geom_smooth(method="lm") +
@@ -102,20 +108,23 @@ ggplot(flux_total) +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   guides(color=guide_legend(title="Vegetation type")) +
-  facet_wrap(~Location, scales="free")
+  facet_wrap(~Location)
 
-ggplot(flux_total) +
-  aes(x=Moisture, y=flux.av) + #, color=Environment
+ggplot(subset(flux_total, flux.av < 6.7)) +
+  aes(x=Moisture, y=flux.av, color=as.POSIXct(Date, format= "%m/%d/%Y")) + #, color=Environment
   geom_point() +
   geom_smooth() +
   xlab("Soil moisture (volumetric)") + ylab("Soil respiration (CO2 flux)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.x = element_text(size = 25),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  guides(color=guide_legend(title="Vegetation type")) +
-  facet_wrap(~Location, scales="free")
+  guides(color=guide_legend(title="Date")) +
+  facet_wrap(~Location)
 
 ggplot(subset(flux_total)) +
   aes(x=as.POSIXct(Time, format= "%H:%M"), y=flux.av, color=as.POSIXct(Time, format= "%H:%M")) +
@@ -150,6 +159,37 @@ ggplot(flux_total) +
 # Dual Arrhenius and Michaelis-Menten Model: DAMM simulates the effects of soil temperature, soil moisture and substrate supply on soil organic matter (SOM) depolymerization. Depolymerization is affected by soil temperature according to Arrhenius kinetics. Soil water content modifies the supply of two substrates, oxygen and a generalized C-containing substrate, both of which affect depolymerization using a Michaelis-Menten (i.e., dual Monod) kinetic approximation)
 # Calculation for Depolymerization rate, using Vmax from Arrhenius equation
 
+```
+
+
+## Combine with river height data for figure
+```{r}
+# First run EastRiver_almont.Rmd script to get river height data (dataframe = "discharge")
+# p1 = flux vs. time from 5/30 thru 9/22
+# p2 = river height vs. time from 5/30 thru 9/22
+
+lims <- as.POSIXct(strptime(c("2018-05-29 00:00:00", "2018-09-23 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+p2 <- ggplot(discharge) +
+  aes(x=datetime, y=gageheight_m) +
+  scale_x_datetime(limits = lims) + 
+  geom_line(color="blue", size=1) +
+  xlab("Date") + ylab("East River height (m)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 33),
+        axis.title = element_text(size = 33),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+
+# Stack the plots
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g <- rbind(g1, g2, size="first")
+g$widths <- unit.pmax(g1$widths, g2$widths)
+grid.newpage()
+grid.draw(g)
 
 ```
 
@@ -157,6 +197,9 @@ ggplot(flux_total) +
 ## Redox data and key, initial figures
 ```{r}
 redox$Probe[redox$Probe == "8b"] <- 8
+
+# Adding arbitrary sampling times to Christian's redox sampling
+redox$Time[redox$Date %in% c("09/22/2018", "09/11/2018", "08/26/2018")] <- "12:00"
            
 # Make datetime column
 redox$Date <- format(redox$Date, format = "%m/%d/%Y")
@@ -184,8 +227,11 @@ ggplot(redox_total) +
   geom_smooth() +
   xlab("Date") + ylab("Eh (mV)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.x = element_text(size = 25),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   facet_wrap(~Location) +
@@ -194,17 +240,19 @@ ggplot(redox_total) +
 # Aggregate depths (average of duplicate/triplicates)
 redox_av.means <- aggregate(redox_av.corrected~Location+datetime+Date+depth_cm, redox_total, mean)
 
-# MCT2-4 for presentation
-ggplot(subset(redox_av.means, Location == "MCT2-4")) +
+ggplot(subset(redox_av.means, Location == "MCT2-1" & depth_cm %in% c(15, 70, 100))) +
   aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
   geom_point() +
-  geom_line() +
+  geom_smooth() +
   xlab("Date") + ylab("Redox potential (mV)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
+  theme(axis.text = element_text(size = 33),
+        axis.title = element_text(size = 33),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()) +
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank()) +
   guides(color=guide_legend(title="Soil depth (cm)"))
 
 ```
@@ -265,7 +313,7 @@ ggplot(subset(flux_watertable, depth_cm %in% 15)) +
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  facet_wrap(~Location, scales="free")
+  facet_wrap(~Location)
 
 ggplot(subset(flux_watertable, depth_cm %in% 15)) +
   aes(x=Moisture, y=flux.av, color=date) + #, color=Environment
@@ -288,8 +336,9 @@ ggplot(subset(flux_watertable, depth_cm %in% 15)) +
   geom_smooth() +
   xlab("Date") + ylab("Water table depth (cm)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   facet_wrap(~Location)
@@ -310,12 +359,16 @@ ggplot(flux_watertable) +
   aes(x=wtd_cm, y=redox_av.corrected, color=depth_cm) +
   geom_point() +
   geom_smooth() +
-  xlab("Water table depth (cm)") + ylab("Redox potential (mV)") +
+  xlab("Water table depth (cm)") + ylab("Eh (mV)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.x = element_text(size = 25),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  facet_wrap(~Location, scales="free")
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~Location)
 
 ```
