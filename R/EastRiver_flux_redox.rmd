@@ -403,10 +403,13 @@ ggplot(subset(redox_av.means, Location == "MCT2-1" & depth_cm %in% c(15, 70, 100
 
 # Make sure dates line up; put date on bottom graph; make legends match (same titles, color, etc.)
 
-ggplot(flux_total[which(flux_total$datetime < "2018-08-10 12:00:00"), ]) +
+lims <- as.POSIXct(strptime(c("2018-05-29 00:00:00", "2018-08-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+
+p1 <- ggplot(flux_total) +
   aes(x=datetime, y=flux.av) +
-  geom_point() +
-  geom_smooth() +
+#  scale_x_datetime(limits = lims) + 
+  geom_point() +  geom_smooth() +
   ylab("Soil respiration (CO2 flux)") +
   facet_wrap(~Location) +
   theme_bw() +
@@ -416,29 +419,15 @@ ggplot(flux_total[which(flux_total$datetime < "2018-08-10 12:00:00"), ]) +
         strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank()) +
+  xlim(lims)
 
-ggplot(subset(redox_av.means)) +
-  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
- # scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
-  geom_point() + geom_smooth() +
-  ylab("Redox potential (mV)") +
-  guides(color=guide_legend(title="Soil depth (cm)")) +
-  facet_wrap(~Location) +
-  theme_bw() +
-  theme(axis.text.y = element_text(size = 33),
-        axis.text.x = element_blank(),
-        axis.title = element_text(size = 33),
-        strip.text.x = element_text(size = 25),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
-
-ggplot(rhiz_toc_av[which(rhiz_toc_av$date < "2018-08-10 12:00:00"), ]) +
-  aes(x=date, y=TOC_mean, color=depth_class) +
+p2 <- ggplot(rhiz_toc_av) +
+  aes(x=as.POSIXct(date), y=TOC_mean, color=depth_class) +
   geom_point() + geom_line() +
+#  scale_x_datetime(limits = lims) + 
   ylab("DOC (mg C / L)") +
-  guides(color=guide_legend(title="Soil depth (cm)")) +
+#  guides(color=guide_legend(title="Soil depth (cm)")) +
   facet_wrap(~position_mct2) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 33),
@@ -447,10 +436,63 @@ ggplot(rhiz_toc_av[which(rhiz_toc_av$date < "2018-08-10 12:00:00"), ]) +
         strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank()) +
+  xlim(lims)
+
+p3 <- ggplot(rhiz_icp_av) +
+  aes(x=as.POSIXct(date), y=SO4_mean, color=depth_class) +
+  geom_point() + geom_line() +
+#  scale_x_datetime(limits = lims) + 
+  ylab("SO4 (mM)") +
+#  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank()) +
+  xlim(lims)
+
+p4 <- ggplot(subset(redox_av.means)) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+#  scale_x_datetime(limits = lims) + 
+  geom_point() + geom_smooth() +
+  ylab("Redox potential (mV)") +
+#  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~Location) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank()) +
+  xlim(lims)
+
+p5 <- ggplot(acclima_av) +
+  aes(x=date, y=moisture_mean, color=depth_cm) +
+#  scale_x_datetime(limits = lims) + 
+  geom_point(size = 1) +
+  xlab("Time") + ylab("Soil moisture (volumetric)") +
+#  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~location) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank()) +
+  xlim(lims)
 
 ggplot(rhiz_icp_av[which(rhiz_icp_av$date < "2018-08-10 12:00:00"), ]) +
-  aes(x=date, y=Fe_mean, color=depth_class) +
+  aes(x=as.POSIXct(date), y=Fe_mean, color=depth_class) +
+#  scale_x_datetime(limits = lims) + 
   geom_point() + geom_line() +
   ylab("Fe (M)") +
   guides(color=guide_legend(title="Soil depth (cm)")) +
@@ -462,35 +504,18 @@ ggplot(rhiz_icp_av[which(rhiz_icp_av$date < "2018-08-10 12:00:00"), ]) +
         strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank()) +
+  xlim(lims)
 
-ggplot(rhiz_icp_av[which(rhiz_icp_av$date < "2018-08-10 12:00:00"), ]) +
-  aes(x=date, y=SO4_mean, color=depth_class) +
-  geom_point() + geom_line() +
-  ylab("SO4 (mM)") +
-  guides(color=guide_legend(title="Soil depth (cm)")) +
-  facet_wrap(~position_mct2) +
-  theme_bw() +
-  theme(axis.text.y = element_text(size = 33),
-        axis.text.x = element_blank(),
-        axis.title = element_text(size = 33),
-        strip.text.x = element_text(size = 25),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+# Stack the plots
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g3 <- ggplotGrob(p3)
+g4 <- ggplotGrob(p4)
+g5 <- ggplotGrob(p5)
 
-ggplot(acclima_av[which(acclima_av$date > "2018-05-27 12:00:00"), ]) +
-  aes(x=date, y=moisture_mean, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("Time") + ylab("Soil moisture (volumetric)") +
-  guides(color=guide_legend(title="Soil depth (cm)")) +
-  facet_wrap(~location) +
-  theme_bw() +
-  theme(axis.text.y = element_text(size = 33),
-        axis.text.x = element_blank(),
-        axis.title = element_text(size = 33),
-        strip.text.x = element_text(size = 25),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+g <- rbind(g2, g3, g4, g5, size="first")
+g$widths <- unit.pmax(g2$widths, g3$widths)
+grid.newpage()
+grid.draw(g)
 ```
