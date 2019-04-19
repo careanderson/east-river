@@ -1,0 +1,412 @@
+---
+title: "EastRiver_AES"
+author: "CGA"
+date: "March 6, 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(reshape2)
+# Set working directory
+setwd("~/east-river/")
+```
+
+### 1. Read in and tidy the MP-ICP-AES data
+```{r}
+mp1 <- read.csv("Data/MP-ICP-AES/3April2018_GG_EastRiver_BulkSeq.csv", skip=2)[, c(1,5,8)]
+mp2 <- read.csv("Data/MP-ICP-AES/5April2018_GG_EastRiver_BulkSeq.csv", skip=2)[, c(1,5,8)]
+
+# Row-bind the two sample data frames together
+mp <- rbind(mp1, mp2)
+
+# Change the "Concentration" column to numeric (R reads it in as a factor)
+mp$Concentration <- as.numeric(as.character(mp$Concentration))
+
+# If the standard checks look good (e.g., "1ppm_check"), then select only samples.
+# Note: All samples have "2x" in them, so tell R to find all rows with "2x" in them.
+mp_samples <- mp[grep("2x", mp$Label), ]
+
+# Separate the "Label" column into three separate columns (ID, extraction, dilution)
+mp_samples <- mp_samples %>%
+  separate(Label, c("ID", "extraction", "dilution", "other"), "_")
+
+# If the sample blanks look good (e.g., concentrations are near zero, except for Na and P for PP and dith extractions), then these can be removed too.
+mp_samples <- mp_samples[!grepl("blank", mp_samples$ID), ]
+
+# If "error" is in the "other" column, remove those data.
+mp_samples <- mp_samples[!grepl("error", mp_samples$other), ]
+
+mp_samples$extraction[mp_samples$extraction == "h20"] <- "h2o"
+
+```
+
+## 2. Read in the sample ID data, correct MP data for soil weight and dilutions, and merge with the sample ID and MP data frames
+```{r}
+# Read in the sample key file
+sample_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
+
+# Separate the "sample" column into two separate columns (location, rep)
+sample_key <- sample_key %>%
+  separate(sample, c("location", "rep"), "-")
+
+# Separate the "depth_cm" column into two separate columns (top_cm, btm_cm)
+sample_key <- sample_key %>%
+  separate(depth_cm, c("top_cm", "btm_cm"), "-")
+
+# Convert the soil depths to numeric, so R treats them as numbers (and not characters).
+sample_key$top_cm <- as.numeric(sample_key$top_cm)
+sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
+
+# Merge the MP-ICP-AES data with the sample key, using the common column "ID".
+mp_total <- merge(mp_samples, sample_key, by="ID")
+
+## Convert concentrations to unit soil, fraction of total extracted metal (e.g., Fe)
+# Per 10 ml, per 0.33g soil, 2x dilution (need exact weights and also correct volumes, different for each extraction)
+mp_total$Concentration_corrected <- (mp_total$Concentration / 10 / 0.33) * 2
+
+# Total of all sequential fractions
+# For each sample and element combination, need to add the four sequential extractions
+
+sum_id_element <- mp_total %>%
+  group_by(ID, Element.Label) %>%
+  summarize(sum_id_element = sum(Concentration_corrected))
+
+mp_total <- merge(mp_total, sum_id_element)
+
+## Depth categories
+# Convert the "extraction" and "location" to factors, so it's easier to plot.
+mp_total$extraction <- as.factor(mp_total$extraction)
+mp_total$location <- as.factor(mp_total$location)
+
+mp_total$depth_category <- -999 #initiate a column for "depth_class"
+mp_total$depth_category <- ifelse(mp_total$top_cm < 40, "shallow", ifelse(mp_total$top_cm > 90, "deep", "subsurface"))
+
+# Make "depth_category" a factor, and order the depth classes
+mp_total$depth_category <- factor(mp_total$depth_category, levels = c("shallow", "subsurface", "deep"))
+
+## Write this file as a new csv
+#write.csv(mp_total, file = "Data/MP-ICP-AES/mp-icp-aes_total_processed.csv")
+```
+
+## 3. Plots
+```{r}
+## Bar chart for fraction of Fe in each sequential extraction step
+# # Melt the data
+mp_melt <- melt(mp_total, id=c("ID", "Element.Label", "extraction", "dilution", "other", "location", "rep", "top_cm", "btm_cm", "depth_category")) #taking out extration
+
+mp_melt$extract <- factor(mp_melt$extraction, levels = c("dith", "hcl", "pp", "h2o"))
+mp_melt$depth_category <- factor(mp_melt$depth_category, levels = unique(mp_melt$depth_category))
+mp_melt$location <- factor(mp_melt$location)
+
+# Stacked bar plots
+ggplot(subset(mp_melt, depth_category %in% c("shallow", "subsurface") & Element.Label %in% "Fe" & variable %in% c("Concentration_corrected"))) +
+  aes(y=value, x=depth_category, fill=extraction) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("") + ylab("mmol Fe g-1") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_fill_discrete(name="Sequential extraction pool", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite")) +
+  facet_grid(location~.)
+
+```
+
+
+## 5. MP-ICP-AES figures
+```{r}
+
+# All data
+ggplot(total) +
+  aes(x=top_cm, y=Concentration, color=extraction) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~Element.Label, scales = "free")
+
+# Fe data
+ggplot(subset(total, Element.Label %in% "Fe")) +
+  aes(x=top_cm, y=Concentration) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+ggplot(subset(total, Element.Label %in% "Fe")) +
+  aes(x=location, y=Concentration) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+# Al data
+ggplot(subset(total, Element.Label %in% "Al")) +
+  aes(x=top_cm, y=Concentration) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+# Si data
+ggplot(subset(total, Element.Label %in% "Si")) +
+  aes(x=top_cm, y=Concentration) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+# Mn data
+ggplot(subset(total, Element.Label %in% "Mn")) +
+  aes(x=top_cm, y=Concentration) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+
+# gradient plot
+ggplot(subset(total, Element.Label %in% "Fe")) +
+  aes(x=top_cm, y=Concentration, color=location) +
+  geom_point() +
+#  geom_line() +
+#  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+```
+
+
+## 6. Stats
+```{r]}
+
+# -----------------------------------------------------------------------------
+# Test hypotheses about selective dissolution
+# -----------------------------------------------------------------------------
+
+# Subset by extraction
+total_fe_pp <- subset(total, Element.Label %in% "Fe" & extraction %in% "pp")
+total_al_pp <- subset(total, Element.Label %in% "Al" & extraction %in% "pp")
+
+total_fe_hcl <- subset(total, Element.Label %in% "Fe" & extraction %in% "hcl")
+total_al_hcl <- subset(total, Element.Label %in% "Al" & extraction %in% "hcl")
+
+total_fe_dith <- subset(total, Element.Label %in% "Fe" & extraction %in% "dith")
+total_al_dith <- subset(total, Element.Label %in% "Al" & extraction %in% "dith")
+
+#1. We expect to see more HCl-extractable metals (e.g. ferrihydrite) in deeper soils that experience
+#water table fluctuations. In other words, we expect more ferrihydrite in zones with rapid redox 
+#fluctuations.
+
+#HCl-Fe or Al vs. soil depth (continuous cm or categorical classes)
+
+ggplot(subset(total, Element.Label %in% "Fe")) +
+  aes(x=top_cm, y=Concentration, color=location) +
+  geom_point() +
+  # geom_line() +
+  #  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+ggplot(subset(total, Element.Label %in% "Al")) +
+  aes(x=top_cm, y=Concentration, color=location) +
+  geom_point() +
+  # geom_line() +
+  #  geom_smooth(method="lm") +
+  facet_wrap(~extraction, scales= "free")
+
+
+# pyrophosphate
+anova(lm(Concentration ~ top_cm, total_fe_pp))
+anova(lm(Concentration ~ top_cm, total_al_pp))
+
+anova(lm(Concentration ~ depth_class, total_fe_pp))
+anova(lm(Concentration ~ depth_class, total_al_pp))
+
+
+# hcl
+anova(lm(Concentration ~ top_cm, total_fe_hcl))
+anova(lm(Concentration ~ top_cm, total_al_hcl))
+
+anova(lm(Concentration ~ depth_class, total_fe_hcl))
+anova(lm(Concentration ~ depth_class, total_al_hcl))
+
+
+
+#2. We expect to see more dithionite-extractable metals where there are more static redox conditions
+#(in mostly oxic zones = soil surface). In other words, we expect more crystalline phases with less 
+#redox fluctuations.
+
+#dith-Fe or Al vs. soil depth (continuous cm or categorical classes)
+
+# dith
+anova(lm(Concentration ~ top_cm, total_fe_dith))
+anova(lm(Concentration ~ top_cm, total_al_dith))
+
+anova(lm(Concentration ~ depth_class, total_fe_dith))
+anova(lm(Concentration ~ depth_class, total_al_dith))
+
+
+
+# -----------------------------------------------------------------------------
+# Combine with Total C and N data (bulk), test hypotheses
+# -----------------------------------------------------------------------------
+total_bulk_cn <- read.csv("Data/EA_data/12April2018_EA_bulk_processed.csv")[,-1]
+
+# Manually changing sd of sample 60 to zero (will rerun on EA in replication to get actual sd)
+# Double check data alignment
+total_bulk_cn$C_sd[19] <- 0
+
+# Prelim figure of total C profile across depth/meander, with standard deviations
+ggplot(total_bulk_cn) +
+  aes(x=top_cm, y=C_mean) + 
+  xlab("Soil depth (cm)") + ylab("Total C in bulk soil (%)") +
+  geom_errorbar(aes(ymin=C_mean-C_sd, ymax=C_mean+C_sd), width=0.8, color="grey") +
+  geom_point(size = 2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 24),
+        axis.title = element_text(size = 24),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+
+# Merge data files
+total_icp_cn <- merge(total_bulk_cn, total)
+
+
+# Change extraction labels for the facet_wrap
+
+extraction_names <- c(
+  dith = "dithionite",
+  h20 = "water",
+  hcl = "HCl",
+  pp = "pyrophosphate"
+)
+
+# Total C vs. extractions (Fe, Al)
+
+ggplot(subset(total_icp_cn, Element.Label %in% "Fe")) +
+  aes(x=Concentration, y=C_mean) +
+  geom_point() +
+  geom_smooth(method="lm") +
+#  ggtitle("Total C in bulk soil vs. Fe ppm by extraction type") +
+  xlab("Fe concentration (ppm), uncorrected") + ylab("Total C in bulk soil (%)") +
+  facet_wrap(~extraction, scales="free", labeller = as_labeller(extraction_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(size=15))
+
+ggplot(subset(total_icp_cn, Element.Label %in% "Al")) +
+  aes(x=Concentration, y=C_mean) +
+  geom_point() +
+  geom_smooth(method="lm") +
+#  ggtitle("Total C in bulk soil vs. Al ppm by extraction type") +
+  xlab("Al concentration (ppm), uncorrected") + ylab("Total C in bulk soil (%)") +
+  facet_wrap(~extraction, scales="free", labeller = as_labeller(extraction_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(size=15))
+
+
+
+# Testing hypotheses:
+#We expect to see more C in reactive metal surfaces
+#-Using the total C data: if there's more C where we see more reactive minerals, then this is a 
+#good indicator that we should see more C in reactive metal surfaces
+#-Pyrophosphate- and HCl-extractable metals are a good predictor of C; use these data to predict C.
+
+total_icp_cn_fe_hcl <- subset(total_icp_cn, Element.Label %in% "Fe" & extraction %in% "hcl")
+total_icp_cn_fe_pp <- subset(total_icp_cn, Element.Label %in% "Fe" & extraction %in% "pp")
+
+total_icp_cn_al_hcl <- subset(total_icp_cn, Element.Label %in% "Al" & extraction %in% "hcl")
+total_icp_cn_al_pp <- subset(total_icp_cn, Element.Label %in% "Al" & extraction %in% "pp")
+
+
+anova(lm(C_mean ~ Concentration, total_icp_cn_fe_hcl))
+anova(lm(C_mean ~ Concentration, total_icp_cn_fe_pp))
+
+anova(lm(C_mean ~ Concentration, total_icp_cn_al_hcl))
+anova(lm(C_mean ~ Concentration, total_icp_cn_al_pp))
+
+
+
+# -----------------------------------------------------------------------------
+# Next steps
+# -----------------------------------------------------------------------------
+# Upload soil weights
+# Divide by soil weight, divide by extraction volume (10ml for h2o, 16.7ml for others), multiply by dilution (2)
+# Proportional MP data (total al, fe, etc.)
+
+# Why doesn't water have triplicates??
+# 3d plot with depth/distance
+# 2d plot with depth/distance and size of point as amount of Fe
+
+
+
+```
+
+
+## Prelim MP-ICP-AES data: Load spreadsheet with raw MP-ICP-AES data
+```{r}
+mp_raw <- read.csv("Data/MP-ICP-AES/5March2018_CA_EastRiver.csv", skip=2)
+
+# Select certain rows
+mp_select <- mp_raw[, c(1:10)]
+
+# Change to numeric
+mp_select$Intensity <- as.numeric(mp_select$Intensity)
+mp_select$Concentration <- as.numeric(mp_select$Concentration)
+
+```
+
+## Look at standards and blanks (pre-processed with MP-ICP-AES software)
+```{r}
+mp_select_standards <- mp_select[mp_select$Type %in% c("STD","BLK"), ]
+
+# Figure: standard curves
+ggplot(subset(mp_select_standards, Type %in% "STD")) +
+  aes(x=Concentration, y=Intensity) +
+  geom_point() + geom_line() +
+  facet_wrap(~Element.Label, scales="free")
+
+```
+
+## Look at samples
+```{r}
+mp_select_samples <- mp_select[mp_select$Type %in% "Sample", ]
+
+# Take out any non-relevant samples
+exclude <- which(with(mp_select_samples, Label=="Standard 7"))
+mp_select_samples <- mp_select_samples[-exclude, ]
+
+# Separate name column
+mp_select_samples <- mp_select_samples %>%
+  separate(Label, c("sample", "extract", "dilution"), "_")
+
+# Figure: samples by extract, dilution
+ggplot(subset(mp_select_samples, extract %in% "h20")) +
+  aes(x=dilution, y=Concentration) +
+  geom_boxplot() +
+  facet_wrap(~Element.Label, scales="free")
+
+ggplot(subset(mp_select_samples, extract %in% "pp")) +
+  aes(x=dilution, y=Concentration) +
+  geom_boxplot() +
+  facet_wrap(~Element.Label, scales="free")
+
+ggplot(subset(mp_select_samples, extract %in% "hcl")) +
+  aes(x=dilution, y=Concentration) +
+  geom_boxplot() +
+  facet_wrap(~Element.Label, scales="free")
+
+ggplot(subset(mp_select_samples, extract %in% "dith")) +
+  aes(x=dilution, y=Concentration) +
+  geom_boxplot() +
+  facet_wrap(~Element.Label, scales="free")
+
+```

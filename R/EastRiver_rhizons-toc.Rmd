@@ -1,0 +1,109 @@
+---
+title: "EastRiver_rhizons-toc"
+author: "CGA"
+date: "April 15, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load and tidy rhizon TOC data
+```{r}
+toc1 <- read.table("Data/TOC/2019_03_06_001_gg_npoc-means.txt", skip=11, fill=TRUE)[, c(3,5)]
+toc2 <- read.table("Data/TOC/2019_04_10_001_gg_npoc-means.txt", skip=11, fill=TRUE)[, c(3,5)]
+toc3 <- read.table("Data/TOC/2019_04_11_001_cga_npoc-means.txt", skip=11, fill=TRUE)[, c(3,5)]
+toc4 <- read.table("Data/TOC/2019_04_18_001_cga_npoc-means.txt", skip=11, fill=TRUE)[, c(3,5)]
+
+# Label columns
+colnames(toc1) <- c("sample","c_ppm")
+colnames(toc2) <- c("sample","c_ppm")
+colnames(toc3) <- c("sample", "c_ppm")
+colnames(toc4) <- c("sample", "c_ppm")
+
+# Remove original 213 and 63 from toc2; the pipet was faulty during the first run so the dilution was off; they were re-run on toc4
+toc2 <- toc2[-grep("213_r", toc2$sample), ]
+toc2 <- toc2[-grep("63_r", toc2$sample), ]
+
+# Row-bind TOC_1 and TOC_2
+rhiz_toc <- rbind(toc1, toc2, toc3, toc4)
+
+# If blanks and standard checks look ok, take them out
+rhiz_toc_samples <- rhiz_toc[-grep("a", rhiz_toc$sample), ] #"a" is in words blank & standard
+rhiz_toc_samples <- rhiz_toc_samples[-grep("ppm", rhiz_toc_samples$sample), ] #remove 10ppm
+rhiz_toc_samples$c_ppm <- as.numeric(rhiz_toc_samples$c_ppm)
+
+# Separate the sample column
+rhiz_toc_samples <- rhiz_toc_samples %>%
+  separate(sample, c("id_r", "rhizon"), "_")
+
+# Remove "rerun" text from re-run 213 and 63
+rhiz_toc_samples$id_r <- str_remove(rhiz_toc_samples$id_r, "rerun")
+
+# Match with rhizon key
+rhizon_key <- read_excel("Data/Summer2018_EastRiver_rhizonkey.xlsx")
+
+rhiz_toc <- merge(rhiz_toc_samples, rhizon_key, by="id_r")
+
+
+## Match depths
+unique(rhiz_toc$depth)
+
+# Change "34-44" to "30-40" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhiz_toc$depth[rhiz_toc$depth == "34-44"] <- "30-40"
+
+# Change "35-45" to "30-40" for MCT2-1, env rw, 6/1/2018 & 6/10/2018
+rhiz_toc$depth[rhiz_toc$depth == "35-45"] <- "30-40"
+
+# Change "63-73" to "60-70" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhiz_toc$depth[rhiz_toc$depth == "63-73"] <- "60-70"
+
+# Change "65-75" to "60-70" for MCT2-4, env 1, 6/1/2018 & 6/10/2018
+rhiz_toc$depth[rhiz_toc$depth == "65-75"] <- "60-70"
+
+# change depths to multiple columns
+rhiz_toc$depth_class <- ifelse(rhiz_toc$depth == "0-10", "surface",
+                                   ifelse(rhiz_toc$depth == "30-40", "30-40",
+                                          ifelse(rhiz_toc$depth == "60-70", "60-80",
+                                                 ifelse(rhiz_toc$depth == "70-80", "60-80",
+                                                        ifelse(rhiz_toc$depth == "80-90", "80-100", "80-100")))))
+
+rhiz_toc$depth_class <- factor(rhiz_toc$depth_class, levels = c("surface", "30-40", "60-80", "80-100"))
+
+# Correct for 10x dilution
+rhiz_toc$c_ppm <- rhiz_toc$c_ppm * 10
+
+
+# Average by date/time & position/depth (averaging the reps rw + rd, 1 + 2, etc.)
+rhiz_toc$year <- year(rhiz_toc$date)
+rhiz_toc$month <- month(rhiz_toc$date)
+rhiz_toc$day <- day(rhiz_toc$date)
+
+rhiz_toc_av <- rhiz_toc %>%
+  group_by(year, month, day, position_mct2, depth_class) %>%
+  summarize(TOC_mean = mean(c_ppm, na.rm=TRUE)) %>%
+  mutate(date = make_date(year, month, day))
+
+```
+
+## Initial figures
+```{r}
+ggplot(rhiz_toc) +
+  aes(x=date, y=c_ppm, color=depth_class) +
+  geom_point() +
+  ylab("DOC (mg C / L)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        strip.text.x = element_text(size = 20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+```

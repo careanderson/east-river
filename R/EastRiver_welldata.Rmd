@@ -1,0 +1,135 @@
+---
+title: "EastRiver_welldata"
+author: "CGA"
+date: "April 18, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary packages
+library(tidyverse)
+library(readxl)
+library(reshape2)
+# Set working directory
+setwd("~/east-river/")
+```
+
+## Load and tidy water sampling data
+```{r}
+read_excel_allsheets <- function(filename) {
+    sheets <- readxl::excel_sheets(filename)
+    x <-    lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    names(x) <- sheets
+    x
+}
+
+mysheets <- read_excel_allsheets('Data/2018_fielddata/2019-04-15_summer2018_water samples.xlsx')
+
+mc_field <- as.data.frame(mysheets[1])[-c(1:5),]
+mc_water <- as.data.frame(mysheets[3])[-c(1:5),]
+
+mc_water_colnames <- as.data.frame(mysheets[3])[5,]
+mc_water_colnames <- unname(unlist(mc_water_colnames[1,]))
+
+colnames(mc_water) <- mc_water_colnames
+
+# Change date from excel format to as.Date
+mc_water$Date <- as.numeric(mc_water$Date)
+mc_water$Date <- as.Date(mc_water$Date, origin="1899-12-30")
+
+# Change columns to numeric
+mc_water$Fe <- as.numeric(mc_water$Fe)
+mc_water$SO4 <- as.numeric(mc_water$SO4)
+mc_water$NO3 <- as.numeric(mc_water$NO3)
+mc_water$Mn <- as.numeric(mc_water$Mn)
+mc_water$NPOC <- as.numeric(mc_water$NPOC)
+mc_water$TC <- as.numeric(mc_water$TC)
+mc_water$TIC <- as.numeric(mc_water$TIC)
+
+# Get all the river water data
+mc_water_river <- mc_water[grep("iver", mc_water$Well), ]
+
+# Get only MCT2 data
+mct2_water <- mc_water[grep("mct2", mc_water$Well, ignore.case=TRUE), ]
+
+# Separate "Well" into multiple columns
+colnames(mct2_water) <- make.unique(names(mct2_water)) #have to run this because there are multiple "sd" column names
+
+mct2_water <- mct2_water %>%
+  separate(Well, c("transect", "position_mct2", "depth"), "-")
+
+```
+
+## Figures
+```{r}
+ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+  aes(x=Date, y=Fe) +
+  geom_point() + geom_line() +
+  ylab("Fe in deep well (M)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+
+ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+  aes(x=Date, y=SO4) +
+  geom_point() + geom_smooth() +
+  ylab("SO4 in deep well (mM)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+
+ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+  aes(x=Date, y=NO3) +
+  geom_point() + geom_line() +
+  ylab("NO3 in deep well (mM)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+
+ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+  aes(x=Date, y=Mn) +
+  geom_point() + geom_line() +
+  ylab("Mn in deep well (M)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+
+ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+  aes(x=Date, y=NPOC) +
+  geom_point() + geom_line() +
+  ylab("NPOC in deep well (mM)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 33),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 33),
+        strip.text.x = element_text(size = 25),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+```
