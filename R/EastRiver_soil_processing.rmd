@@ -141,12 +141,21 @@ ggplot(soil.sieved, aes(x=root_frac, y=mean.depth_cm, color=location)) +
   xlab("Root biomass per g sieved soil (mg root/g soil)") +
   ylab("Depth (cm)")
 
-ggplot(soil.sieved, aes(x=log(root_frac), y=mean.depth_cm, color=location)) +
+ggplot(soil.sieved) +
+  aes(x=log(root_frac), y=mean.depth_cm, color=location) +
   geom_point() +
-#  geom_smooth(method="lm") +
+  geom_smooth(method="lm") +
   scale_y_reverse() +
   xlab("Log root biomass per g sieved soil (log(mg root/g soil))") +
-  ylab("Depth (cm)")
+  ylab("Soil depth (cm)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Location"))
 
 # Fraction <2mm (by air dry weight)
 ggplot(soil.sieved, aes(x=soil_frac, y=mean.depth_cm, color=location)) +

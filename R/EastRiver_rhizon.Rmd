@@ -253,7 +253,6 @@ rhizon_total <- subset(rhizon_total, water_g > 0.15)
 
 # Henry's law states that the mole fraction of a dissolved gas (Xg) is equal to the partial pressure of the gas (pg) at equilibrium divided by Henry's law constant (H). Gas solubility coefficients are used to calculate Henry's law constant.
 
-
 # C = P/KH
 #P is the partial pressure of the gas above the solution (ppm measured directly on li-cor * 10^-6 = atm)
 #KH is the Henry's law constant for the solution. Given: KH of CO2 in water = 29.41 atm/(mol/L) at 25 °C (298 K).
@@ -261,11 +260,11 @@ rhizon_total <- subset(rhizon_total, water_g > 0.15)
 
 # C = (partial pressure CO2) / 29.41 atm(mol/L)
 
-rhizon_total$water_mol_co2 <- (rhizon_total$conc * 1*10^-6) * rhizon_total$water_L
-rhizon_total$air_mol_co2 <- (rhizon_total$conc * 1*10^-6) * (12 - rhizon_total$water_L)
+rhizon_total$water_mol_co2 <- ((rhizon_total$conc * (1*10^-6))/29.41) * rhizon_total$water_L
+rhizon_total$air_mol_co2 <- (rhizon_total$conc) * (0.012 - rhizon_total$water_L) * (1/44.01) * (1/1000) #vials are 12ml = 0.012 L; molar mass of co2 is 44.01 g/mol; 1000 mg in g
 
 rhizon_total$total_mol_co2 <- rhizon_total$water_mol_co2 + rhizon_total$air_mol_co2
-rhizon_total$doc_aq <- rhizon_total$total_mol_co2 / rhizon_total$water_L
+rhizon_total$dic_aq <- rhizon_total$total_mol_co2 / rhizon_total$water_L
 
 # Adding depth classes (surface, mid, deep)
 
@@ -280,10 +279,40 @@ rhizon_total$depth_class <- ifelse(rhizon_total$depth_cm == "0-10", "surface",
 
 ## Preliminary figures
 ```{r}
-ggplot(rhizon_total) +
-  aes(x=date, y=doc_aq, color=as.factor(mct2_position)) +
+rhizon_total$depth_class <- factor(rhizon_total$depth_class, levels = c("surface", "30-40", "60-80", "80-100"))
+
+ggplot(subset(rhizon_total, mct2_position %in% c(1,3))) +
+  aes(x=date, y=dic_aq, color=as.factor(mct2_position)) +
   geom_point() +
-#  geom_smooth() +
-  facet_wrap(~depth_class)
+  geom_smooth() +
+  xlab("Date") + ylab("DIC (mol)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.y = element_text(size = 20),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Transect")) +
+  scale_colour_manual(values = c("1" = "#000000", "3" = "#E69F00", "4" = "#56B4E9")) +
+  facet_grid(depth_class~.)
+
+ggplot(subset(rhizon_total, mct2_position %in% c(4))) +
+  aes(x=date, y=dic_aq, color=as.factor(mct2_position)) +
+  geom_point() +
+  geom_smooth() +
+  xlab("Date") + ylab("DIC (mol)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.y = element_text(size = 20),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Transect")) +
+  scale_colour_manual(values = c("1" = "#000000", "3" = "#E69F00", "4" = "#56B4E9")) +
+  facet_grid(depth_class~.)
 
 ```

@@ -16,24 +16,28 @@ setwd("~/east-river/")
 
 ## Load files with TOC data, average reps, use standards to convert to ppm (mg C L-1), export
 ```{r}
-toc <- read.table("Data/TOC/2018_11_15_001_cga.txt", sep="\t", skip=2, fill=TRUE)
-toc_colnames <- as.matrix(read.table("Data/TOC/2018_11_15_001_cga.txt", sep="\t", fill=TRUE)[2,])
+toc <- read.table("Data/TOC/2018_11_30_001_ia.txt", sep="\t", skip=2, fill=TRUE)
+toc_colnames <- as.matrix(read.table("Data/TOC/2018_11_30_001_ia.txt", sep="\t", fill=TRUE)[2,])
 names(toc) <- toc_colnames
 toc <- toc[, -25] #removing last column, which is empty
 
 toc <- subset(toc, select = c(`Sample Name`, `Sample ID`, `Date / Time`, `Inj. No.`, `Area`, `Mean Area`, `SD Area`, `CV Area`))
 
 # Take out standard checks and blank checks
-toc_full <- toc[-c(21:27, 48:51, 62:72), ] ## UPDATE THIS FOR EACH DATA FILE
+toc_full <- toc[-c(13:25, 46:49), ] ## UPDATE THIS FOR EACH DATA FILE
 
 # Average the replicates
 toc_av <- toc_full %>%
   group_by(`Sample Name`) %>%
   summarize(area_mean = mean(`Area`))
 
+# Filter out only samples
+toc_samples <- toc_av %>%
+  filter(!str_detect(`Sample Name`, paste(c("std", "blank", "Std", "Blank"), collapse = "|")))
+
 # Take out blank & standards, make standard curve
 toc_standards <- toc_av %>%
-  filter(str_detect(`Sample Name`, paste(c("std", "blank"), collapse = "|")))
+  filter(str_detect(`Sample Name`, paste(c("std", "blank", "Std", "Blank"), collapse = "|")))
 
 toc_standards <- toc_standards %>%
   mutate(conc = ifelse(str_detect(toc_standards$'Sample Name', "1000"), 1000, 
@@ -45,146 +49,111 @@ toc_standards <- toc_standards %>%
                                                           ifelse(str_detect(toc_standards$'Sample Name', "_15"), 15.625,
                                                                  ifelse(str_detect(toc_standards$'Sample Name', "7"), 7.8125,
                                                                         ifelse(str_detect(toc_standards$'Sample Name', paste(c("3.", "3p"), collapse = "|")), 3.90625,
-                                                                               ifelse(str_detect(toc_standards$'Sample Name', "blank"), 0, -999)))))))))))
+                                                                               ifelse(str_detect(toc_standards$'Sample Name', "blank"), 0, 0)))))))))))
 
 # Remove 1000ppm and 500ppm, if necessary
-toc_standards <- subset()
+toc_standards <- subset(toc_standards, conc < 500)
 
 plot(toc_standards$conc, toc_standards$area_mean)
 lm <- lm(area_mean ~ conc, data=toc_standards)
 abline(lm, col="red")
+coef(lm)
 
-plot(gas1_std$mct2_position_or_standard, gas1_std$area) #plot
-gas1_lm <- lm(area ~ mct2_position_or_standard, data=gas1_std)
-abline(gas1_lm, col="red")
-summary(gas1_lm)
-coef(gas1_lm) #b=0.94712978, m=0.03382774
+# Convert areas into concentrations
+toc_samples$conc <- (toc_samples$area_mean - 36.120508) / 6.546675 ### UPDATE EACH RUN
 
-gas1$conc <- (gas1$area - 0.94712978) / 0.03382774
-  
-# Separate the samples and correct Area to ppm (mg C L-1)
+# Print file
+write.csv(toc_samples, "2018_11_28_001_ia.csv") ### UPDATE EACH RUN
 
-# If blanks and standard checks look ok, take them out
-TOC_samples <- TOC[grep("x", TOC$sample), ]
-TOC_samples$c_ppm <- as.numeric(TOC_samples$c_ppm)
-
-# Separate the sample column
-TOC_samples <- TOC_samples %>%
-  separate(sample, c("ID", "extraction", "dilution_toc"), "-")
 
 ```
 
 
-## Merge with MP-ICP-AES data
+## Process merged data
 ```{r}
-mp <- read.csv("Data/MP-ICP-AES/mp-icp-aes_total_processed.csv")
-cn <- read.csv("Data/EA_data/25April2018_EA_total_cn_processed.csv")
+# Load each processed file
+rhiz1 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_15_001_cga.csv")[, -1]
+rhiz2 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_15_002_gg.csv")[, -1]
+rhiz3 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_17_003_cga.csv")[, -1]
+rhiz4 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_17_004_gg.csv")[, -1]
+rhiz5 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_18_001_cga.csv")[, -1]
+rhiz6 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_19_001_ia.csv")[, -1]
+rhiz7 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_20_001_ia.csv")[, -1]
+rhiz8 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_27_001_cga.csv")[, -1]
+rhiz9 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_27_005_gg.csv")[, -1]
+rhiz10 <- read_csv("Data/TOC/TOC_direct_injection_processed/2018_11_28_001_ia.csv")[, -1]
 
-# Replace "h20" with "h2o" in mp dataframe
-mp$extraction <- as.character(mp$extraction)
-mp$extraction[mp$extraction == "h20"] <- "h2o"
+# Merge files
+rhiz <- rbind(rhiz1, rhiz2, rhiz3, rhiz4, rhiz5, rhiz6, rhiz7, rhiz8, rhiz9, rhiz10)
 
-toc_mp <- merge(TOC_samples, mp, by=c("ID", "extraction"))
+rhiz <- rhiz %>%
+  separate(`Sample Name`, c("id_r", "rhizon"), sep="_")
 
-```
+# Merge with data key
+rhizon_key <- read_excel("Data/Summer2018_EastRiver_rhizonkey.xlsx")
 
-## Correct TOC data, figures
-```{r}
+rhiz_merge <- merge(rhiz, rhizon_key, by="id_r")
 
-# 10x dilution for pyrophosphate, 2x dilution for all others
-#Need to report C in mol C g-1 soil, so you will want to multiply the initial value (mg L-1) by (volume of extractant in L/mass of soil in g). The resulting number is then divided by 12 mg mmol-1 (or g mol-1). FYI - multiply by 1000 to get mmol C g-1.
-toc_mp$mol_c_per_g[toc_mp$extraction=="pp"] <- 
-  (toc_mp$c_ppm[toc_mp$extraction=="pp"] * 10) * (0.01/0.33) * (1/12)
-
-toc_mp$mol_c_per_g[toc_mp$extraction=="dith"] <- 
-  (toc_mp$c_ppm[toc_mp$extraction=="dith"] * 2) * (0.01/0.33) * (1/12)
-
-toc_mp$mol_c_per_g[toc_mp$extraction=="hcl"] <- 
-  (toc_mp$c_ppm[toc_mp$extraction=="hcl"] * 2) * (0.01/0.33) * (1/12)
-
-toc_mp$mol_c_per_g[toc_mp$extraction=="h2o"] <- 
-  (toc_mp$c_ppm[toc_mp$extraction=="h2o"] * 2) * (0.01/0.33) * (1/12)
+colnames(rhiz_merge)[7] <- "depth_cm"
 
 
-# TOC figures (amount per depth across transect)
-toc_mp$extraction <- factor(toc_mp$extraction, levels = c("dith", "hcl", "pp", "h2o"))
-toc_mp$depth_category <- factor(toc_mp$depth_category, levels = unique(toc_mp$depth_category))
 
-ggplot(subset(toc_mp, `Element.Label` %in% "Fe" & depth_category %in% c("shallow", "subsurface"))) +
-  aes(x=depth_category, y=mol_c_per_g, fill=extraction) +
-  geom_bar(stat="identity") +
-  coord_flip() +
-  xlab("") + ylab(expression(Organic~Carbon~(mol~g^-1))) +
-  theme_bw() +
-  theme(axis.text = element_text(size = 30),
-        axis.title = element_text(size = 35),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text.y = element_text(size = 35),
-        legend.title=element_text(size=27),
-        legend.text=element_text(size=27),
-        legend.position = 'top', 
-        legend.spacing = unit(16, 'pt')) +
-  scale_fill_manual(name="", breaks = c("h2o", "pp", "hcl", "dith"), labels = c("Water", "Pyrophosphate", "HCl", "Dithionite"), values=rev(c("#0072B2", "#F0E442", "#000000", "#009E73"))) +
-  facet_grid(location~.)
+## Make changes to match gas data nomenclature
+# Change "by river" to "rw"
+rhiz_merge$environment[rhiz_merge$environment == "by river"] <- "rw"
+
+# Change "un" to "2", for MCT2-4, 70-80cm, 6/18/2018
+rhiz_merge$environment[rhiz_merge$environment == "un"] <- "2"
+
+# Change "34-44" to "30-40" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhiz_merge$depth_cm[rhiz_merge$depth_cm == "34-44"] <- "30-40"
+
+# Change "35-45" to "30-40" for MCT2-1, env rw, 6/1/2018 & 6/10/2018
+rhiz_merge$depth_cm[rhiz_merge$depth_cm == "35-45"] <- "30-40"
+
+# Change "63-73" to "60-70" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhiz_merge$depth_cm[rhiz_merge$depth_cm == "63-73"] <- "60-70"
+
+# Change "65-75" to "60-70" for MCT2-4, env 1, 6/1/2018 & 6/10/2018
+rhiz_merge$depth_cm[rhiz_merge$depth_cm == "65-75"] <- "60-70"
 
 
-# TOC vs. metals
-ggplot(subset(toc_mp, `Element.Label` %in% "Fe")) +
-  aes(x=top_cm, y=mol_c_per_g) +
+
+
+
+rhiz_merge$depth_class <- ifelse(rhiz_merge$depth_cm == "surf", "surface",
+                                 ifelse(rhiz_merge$depth_cm == "0-10", "surface",
+                                   ifelse(rhiz_merge$depth_cm == "30-40", "30-40",
+                                          ifelse(rhiz_merge$depth_cm == "60-70", "60-80",
+                                                 ifelse(rhiz_merge$depth_cm == "70-80", "60-80",
+                                                        ifelse(rhiz_merge$depth_cm == "80-90", "80-100", "80-100"))))))
+
+
+
+
+
+
+rhiz_merge$depth_class <- factor(rhiz_merge$depth_class, levels = c("surface", "30-40", "60-80", "80-100"))
+
+ggplot(rhiz_merge) +
+  aes(x=date, y=conc, color=as.factor(depth_class)) +
   geom_point() +
-  facet_wrap(~extraction, scales="free") +
-  xlab("soil depth (cm)") + ylab("TOC (ppm)")
+  geom_smooth()
 
-toc_mp$extraction2 <- factor(toc_mp$extraction, levels = c("h2o", "pp", "hcl", "dith"))
-levels(toc_mp$extraction2) <- c("Water", "Pyrophosphate", "HCl", "Dithionite")
-
-ggplot(subset(toc_mp, `Element.Label` %in% "Fe")) +
-  aes(x=Concentration_corrected, y=mol_c_per_g) +
-  geom_point(aes(color=location, size=3)) + geom_smooth(method="lm") +
-  facet_wrap(~extraction2, scales="free") +
-  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mol~g^-1))) +
-  labs(color= "Location") +
+ggplot(rhiz_merge) +
+  geom_point(aes(x=date, y=conc, color=as.factor(position_mct2))) +
+  geom_smooth(aes(x=date, y=conc)) +
+  xlab("Date") + ylab("DOC (mg C / L)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 18),
-        axis.title = element_text(size = 35),
+  theme(axis.text = element_text(size = 25),
+        axis.title = element_text(size = 25),
+        strip.text.y = element_text(size = 20),
+        legend.title=element_text(size=20),
+        legend.text=element_text(size=20),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        strip.text.x = element_text(size = 35),
-        legend.title=element_text(size=30),
-        legend.text=element_text(size=30),
-        legend.key.size = unit(3,"point")) +
-  scale_size_continuous(guide=FALSE) +
-  guides(color = guide_legend(override.aes = list(size=5)))
-
-# R2 and p-values for TOC vs. Fe correlations (by extraction)
-fe_toc_water <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "h2o")
-fe_toc_pp <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "pp")
-fe_toc_hcl <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "hcl")
-fe_toc_dith <- subset(toc_mp, `Element.Label` %in% "Fe" & extraction %in% "dith")
-
-# Water
-plot(fe_toc_water$Concentration_corrected, fe_toc_water$mol_c_per_g)
-fe_water_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_water)
-abline(fe_water_model, col = "red")
-summary(fe_water_model)
-
-# Pyrophosphate
-plot(fe_toc_pp$Concentration_corrected, fe_toc_pp$mol_c_per_g)
-fe_pp_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_pp)
-abline(fe_pp_model, col = "red")
-summary(fe_pp_model)
-
-# HCl
-plot(fe_toc_hcl$Concentration_corrected, fe_toc_hcl$mol_c_per_g)
-fe_hcl_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_hcl)
-abline(fe_hcl_model, col = "red")
-summary(fe_hcl_model)
-
-# Dithionite
-plot(fe_toc_dith$Concentration_corrected, fe_toc_dith$mol_c_per_g)
-fe_dith_model <- lm(mol_c_per_g ~ Concentration_corrected, data=fe_toc_dith)
-abline(fe_dith_model, col = "red")
-summary(fe_dith_model)
+        panel.grid.minor = element_blank()) +
+  guides(color=guide_legend(title="Location")) +
+  scale_colour_manual(values = c("1" = "#000000", "3" = "#E69F00", "4" = "#56B4E9")) +
+  facet_grid(depth_class~., scales="free")
 
 ```

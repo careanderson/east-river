@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(gridExtra)
+library(lubridate)
 # Set working directory
 setwd("~/east-river/")
 ```
@@ -45,7 +46,7 @@ mc1$location <- "MCT2-1"
 ```
 
 
-## Name soil depths, rbind all
+## Name soil depths, rbind all, average by position/depth
 ```{r}
 # initially, labeled: surface, mid_30cm, deep_70cm
 
@@ -62,6 +63,18 @@ mc1$depth_cm <- ifelse(mc1$sensor %in% c(9000014, 9000176), "15",
                     ifelse(mc1$sensor %in% c(9000170, 9000180), "30", "70"))
 
 acclima_total <- rbind(mc1, mc3, mc4)
+
+# Average by date/time & position/depth
+acclima_total$year <- year(acclima_total$time)
+acclima_total$month <- month(acclima_total$time)
+acclima_total$day <- day(acclima_total$time)
+acclima_total$hour <- hour(acclima_total$time)
+
+acclima_av <- acclima_total %>%
+  group_by(year, month, day, hour, location, depth_cm) %>%
+  summarize(moisture_mean = mean(moisture, na.rm=TRUE)) %>%
+  mutate(date = make_datetime(year, month, day, hour))
+
 ```
 
 
