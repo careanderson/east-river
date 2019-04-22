@@ -49,21 +49,30 @@ mc_water$TIC <- as.numeric(mc_water$TIC)
 
 # Get all the river water data
 mc_water_river <- mc_water[grep("iver", mc_water$Well), ]
+mc_water_river$well_river <- "river"
 
 # Get only MCT2 data
 mct2_water <- mc_water[grep("mct2", mc_water$Well, ignore.case=TRUE), ]
+mct2_water$well_river <- "well"
+
+# Combine mct2 and river data (rbind)
+mct2_water_all <- rbind(mct2_water, mc_water_river)
 
 # Separate "Well" into multiple columns
-colnames(mct2_water) <- make.unique(names(mct2_water)) #have to run this because there are multiple "sd" column names
+colnames(mct2_water_all) <- make.unique(names(mct2_water_all)) #have to run this because there are multiple "sd" column names
 
-mct2_water <- mct2_water %>%
+mct2_water_all <- mct2_water_all %>%
   separate(Well, c("transect", "position_mct2", "depth"), "-")
+
+# For river samples, change "position_mct2" to "river" and "depth" to "D"
+mct2_water_all$position_mct2[mct2_water_all$well_river == "river"] <- "river"
+mct2_water_all$depth[mct2_water_all$well_river == "river"] <- "D"
 
 ```
 
 ## Figures
 ```{r}
-ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+ggplot(subset(mct2_water_all[which(mct2_water_all$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4, "river"))) +
   aes(x=Date, y=Fe) +
   geom_point() + geom_line() +
   ylab("Fe in deep well (M)") +
@@ -77,7 +86,7 @@ ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], dept
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank())
 
-ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+ggplot(subset(mct2_water_all[which(mct2_water_all$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4, "river"))) +
   aes(x=Date, y=SO4) +
   geom_point() + geom_smooth() +
   ylab("SO4 in deep well (mM)") +
@@ -91,7 +100,7 @@ ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], dept
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank())
 
-ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+ggplot(subset(mct2_water_all[which(mct2_water_all$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4, "river"))) +
   aes(x=Date, y=NO3) +
   geom_point() + geom_line() +
   ylab("NO3 in deep well (mM)") +
@@ -105,7 +114,7 @@ ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], dept
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank())
 
-ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+ggplot(subset(mct2_water_all[which(mct2_water_all$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4, "river"))) +
   aes(x=Date, y=Mn) +
   geom_point() + geom_line() +
   ylab("Mn in deep well (M)") +
@@ -119,7 +128,7 @@ ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], dept
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank())
 
-ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
+ggplot(subset(mct2_water_all[which(mct2_water_all$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4, "river"))) +
   aes(x=Date, y=NPOC) +
   geom_point() + geom_line() +
   ylab("NPOC in deep well (mM)") +
@@ -132,6 +141,7 @@ ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], dept
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank())
+
 ```
 
 ## DOE PI meeting poster for May 2019
@@ -144,8 +154,11 @@ ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], dept
 
 lims <- as.POSIXct(strptime(c("2018-05-29 00:00:00", "2018-08-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
 
-w1 <- ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
-  aes(x=Date, y=NPOC) +
+# Order of river and well and positions
+mct2_water_all$position_mct2 <- factor(mct2_water_all$position_mct2, levels = c("river",1,3))
+
+w1 <- ggplot(subset(mct2_water_all, depth %in% "D" & position_mct2 %in% c("river",1,3))) +
+  aes(x=as.POSIXct(Date), y=NPOC) +
   geom_point() + geom_smooth() +
   ylab("NPOC (mM)") +
   facet_wrap(~position_mct2) +
@@ -153,13 +166,15 @@ w1 <- ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ]
   theme(axis.text.y = element_text(size = 12),
         axis.text.x = element_blank(),
         axis.title = element_text(size = 12),
-        strip.text.x = element_text(size = 12),
+        #strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims)
 
-w2 <- ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
-  aes(x=Date, y=SO4) +
+w2 <- ggplot(subset(mct2_water_all, depth %in% "D" & position_mct2 %in% c("river","1","3"))) +
+  aes(x=as.POSIXct(Date), y=SO4) +
   geom_point() + geom_smooth() +
   ylab("SO4 (mM)") +
   facet_wrap(~position_mct2) +
@@ -167,38 +182,44 @@ w2 <- ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ]
   theme(axis.text.y = element_text(size = 12),
         axis.text.x = element_blank(),
         axis.title = element_text(size = 12),
-        strip.text.x = element_text(size = 12),
+        #strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims)
 
-w3 <- ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
-  aes(x=Date, y=Fe) +
+w3 <- ggplot(subset(mct2_water_all, depth %in% "D" & position_mct2 %in% c("river","1","3"))) +
+  aes(x=as.POSIXct(Date), y=Fe*1000) +
   geom_point() + geom_smooth() +
-  ylab("Fe (M)") +
+  ylab("Fe (mM)") +
   facet_wrap(~position_mct2) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 12),
         axis.text.x = element_blank(),
         axis.title = element_text(size = 12),
-        strip.text.x = element_text(size = 12),
+        #strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims)
 
-w4 <- ggplot(subset(mct2_water[which(mct2_water$Date < "2018-08-10 12:00:00"), ], depth %in% "D" & position_mct2 %in% c(1,3,4))) +
-  aes(x=Date, y=Mn) +
+w4 <- ggplot(subset(mct2_water_all, depth %in% "D" & position_mct2 %in% c("river","1","3"))) +
+  aes(x=as.POSIXct(Date), y=Mn*1000) +
   geom_point() + geom_smooth() +
-  ylab("Mn (M)") +
+  ylab("Mn (mM)") +
   facet_wrap(~position_mct2) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 12),
 #        axis.text.x = element_blank(),
         axis.title = element_text(size = 12),
-        strip.text.x = element_text(size = 12),
+        #strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank())
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims)
 
 # Stack the plots
 gw1 <- ggplotGrob(w1)
@@ -211,5 +232,4 @@ g$widths <- unit.pmax(gw1$widths, gw2$widths)
 grid.newpage()
 grid.draw(g)
 
-  
 ```

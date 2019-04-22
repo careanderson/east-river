@@ -79,6 +79,9 @@ rhiz_toc$depth_class <- factor(rhiz_toc$depth_class, levels = c("surface", "30-4
 # Correct for 10x dilution
 rhiz_toc$c_ppm <- rhiz_toc$c_ppm * 10
 
+# Convert to mM (to match Patricia's data)
+rhiz_toc$c_mm <- (rhiz_toc$c_ppm / 12.01) / 1000
+
 
 # Average by date/time & position/depth (averaging the reps rw + rd, 1 + 2, etc.)
 rhiz_toc$year <- year(rhiz_toc$date)
@@ -87,7 +90,7 @@ rhiz_toc$day <- day(rhiz_toc$date)
 
 rhiz_toc_av <- rhiz_toc %>%
   group_by(year, month, day, position_mct2, depth_class) %>%
-  summarize(TOC_mean = mean(c_ppm, na.rm=TRUE)) %>%
+  summarize(TOC_mean = mean(c_ppm, na.rm=TRUE), TOC_mm_mean = mean(c_mm, na.rm=TRUE)) %>%
   mutate(date = make_date(year, month, day))
 
 ```
@@ -97,7 +100,20 @@ rhiz_toc_av <- rhiz_toc %>%
 ggplot(rhiz_toc) +
   aes(x=date, y=c_ppm, color=depth_class) +
   geom_point() +
-  ylab("DOC (mg C / L)") +
+  ylab("NPOC (mg C / L)") +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        strip.text.x = element_text(size = 20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank())
+
+ggplot(rhiz_toc) +
+  aes(x=date, y=c_mm, color=depth_class) +
+  geom_point() +
+  ylab("NPOC (mM)") +
   facet_wrap(~position_mct2) +
   theme_bw() +
   theme(axis.text = element_text(size = 20),
