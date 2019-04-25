@@ -40,6 +40,11 @@ colnames(er_redo) <- c("full_name", "instrument_name", "sample", "sample_id", "s
   "N_ret_min", "N_resp", "N_wt_mg", "N_wt_pct", "N_peaktype", "N_element_name", "N_C_resp_ratio", 
   "C_ret_min", "C_resp", "C_wt_mg", "C_wt_pct", "C_peaktype", "C_element_name", "C_C_resp_ratio")
 
+# Adding sample IDs for er_redo
+er_redo$sample_id <- c("standard", "standard", "standard", "standard", "bypass", "31-1", "31-2", "27-1", "27-2", "60-1", "60-2", "40-1", "40-2", "blank")
+
+
+
 # Split fraction and sample name
 er_heavy <- er_heavy %>%
   separate(sample_id, c("fraction", "sample-rep"), "_")

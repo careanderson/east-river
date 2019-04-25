@@ -22,12 +22,16 @@ rhiz_icp <- read_excel("Data/MC_rhizon_Summer2018_EastRiver_datasum_LBL.xlsx", s
 rhiz_icp$id_r <- as.numeric(rhiz_icp$id_r)
 rhiz_icp$position_mct2 <- as.numeric(rhiz_icp$position_mct2)
 
+# make "BDL" = 0
+rhiz_icp$NO3[rhiz_icp$NO3 == "BDL"] <- 0
+rhiz_icp$SO4[rhiz_icp$SO4 == "BDL"] <- 0
+rhiz_icp$Fe[rhiz_icp$Fe == "BDL"] <- 0
+
 # make values numeric
 rhiz_icp$Fe <- as.numeric(rhiz_icp$Fe)
 rhiz_icp$NO3 <- as.numeric(rhiz_icp$NO3)
 rhiz_icp$SO4 <- as.numeric(rhiz_icp$SO4)
 rhiz_icp$Mn <- as.numeric(rhiz_icp$Mn)
-rhiz_icp$PO4 <- as.numeric(rhiz_icp$PO4)
 
 # match depths
 # Change "34-44" to "30-40" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
@@ -64,6 +68,11 @@ rhiz_icp_av <- rhiz_icp %>%
             NO3_mean = mean(NO3, na.rm=TRUE),
             Mn_mean = mean(Mn, na.rm=TRUE)) %>%
   mutate(date = make_date(year, month, day))
+
+# generate list of samples submitted to Patricia (take out rows with "x" for Cl)
+rhiz_icp_submitted <- rhiz_icp[-grep("x", rhiz_icp$Cl), ]
+#write.csv(rhiz_icp_submitted, file = "rhiz_icp_submitted.csv")
+
 ```
 
 ## Initial figures
@@ -94,7 +103,7 @@ ggplot(rhiz_icp) +
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank())
 
-ggplot(rhiz_icp) +
+ggplot(subset(rhiz_icp)) +
   aes(x=date, y=NO3, color=depth_class) +
   geom_point() +
   ylab("NO3 (mM)") +
