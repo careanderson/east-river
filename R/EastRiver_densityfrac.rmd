@@ -66,9 +66,12 @@ dens.frac.merge$bottom[dens.frac.merge$ID==49] <- 68
 dens.frac.merge$mean.depth_cm <- rowMeans(subset(dens.frac.merge, select = c(top, bottom)), na.rm = TRUE)
 
 # Calculate percentage of each fraction of total soil weight
-dens.frac.merge$light_frac_per <- dens.frac.merge$light_frac_g / dens.frac.merge$soil_mass_g
-dens.frac.merge$int_frac_per <- dens.frac.merge$int_frac_g / dens.frac.merge$soil_mass_g
-dens.frac.merge$heavy_frac_per <- dens.frac.merge$heavy_frac_g / dens.frac.merge$soil_mass_g
+dens.frac.merge$light_frac_percent <- dens.frac.merge$light_frac_g / dens.frac.merge$soil_mass_g
+dens.frac.merge$int_frac_percent <- dens.frac.merge$int_frac_g / dens.frac.merge$soil_mass_g
+dens.frac.merge$heavy_frac_percent <- dens.frac.merge$heavy_frac_g / dens.frac.merge$soil_mass_g
+
+# Export as csv
+#write.csv(dens.frac.merge, "Data/0.processed_data/EA_dens-fractionation_2017_processed.csv")
 
 ```
 
