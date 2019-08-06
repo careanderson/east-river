@@ -25,7 +25,7 @@ er_heavy <- read.table("Data/EA_Data/CA_ER_heavy_7Nov2017.txt", sep="\t")
 er_bulk_ed <- read_excel("Data/EA_Data/CA_ER_bulk_6Nov2017_corrected.xlsx")[,-(1:4)]
 er_int <- read.table("Data/EA_Data/CA_ER_int_10Nov2017.txt", sep="\t")
 
-er_redo <- read.table("Data/EA_Data/CA_180920.txt", sep="\t")[-(1:2),] #Mariela re-ran these samples Sept 2018
+er_redo <- read.table("Data/EA_Data/CA_180920.txt", sep="\t")[-c(1:7, 16),] #Mariela re-ran these samples Sept 2018; removing all rows except samples
 
 # Adding column names
 colnames(er_heavy) <- c("full_name", "instrument_name", "sample", "sample_id", "sample_amt", 
@@ -41,37 +41,88 @@ colnames(er_redo) <- c("full_name", "instrument_name", "sample", "sample_id", "s
   "C_ret_min", "C_resp", "C_wt_mg", "C_wt_pct", "C_peaktype", "C_element_name", "C_C_resp_ratio")
 
 # Adding sample IDs for er_redo
-er_redo$sample_id <- c("standard", "standard", "standard", "standard", "bypass", "31-1", "31-2", "27-1", "27-2", "60-1", "60-2", "40-1", "40-2", "blank")
+er_redo$sample_id <- c("31-1", "31-2", "27-1", "27-2", "60-1", "60-2", "40-1", "40-2")
 
+# Changing sample_id to "sample-rep"
+colnames(er_redo)[4] <- "sample_rep"
+colnames(er_bulk_ed)[1] <- "sample_rep"
 
+# Adding fraction = bulk to er_redo and er_bulk_ed
+er_redo$fraction <- "bulk"
+er_bulk_ed$fraction <- "bulk"
 
 # Split fraction and sample name
 er_heavy <- er_heavy %>%
-  separate(sample_id, c("fraction", "sample-rep"), "_")
+  separate(sample_id, c("fraction", "sample_rep"), "_")
 
 er_int <- er_int %>%
-  separate(sample_id, c("fraction", "sample-rep"), "_")
+  separate(sample_id, c("fraction", "sample_rep"), "_")
+
+# remove standards from er_int
+er_int <- er_int[grepl("int", er_int$fraction), ]
+
+# Select columns
+er_bulk_ed <- er_bulk_ed[,c("fraction", "sample_rep", "sample_amt", "N_wt_mg", "N_wt_pct", "C_wt_mg", "C_wt_pct")]
+er_heavy <- er_heavy[,c("fraction", "sample_rep", "sample_amt", "N_wt_mg", "N_wt_pct", "C_wt_mg", "C_wt_pct")]
+er_int <- er_int[,c("fraction", "sample_rep", "sample_amt", "N_wt_mg", "N_wt_pct", "C_wt_mg", "C_wt_pct")]
+er_redo <- er_redo[,c("fraction", "sample_rep", "sample_amt", "N_wt_mg", "N_wt_pct", "C_wt_mg", "C_wt_pct")]
+```
+
+## Add soil weights for bulk-redo data
+```{r}
+# read in soil weights for bulk-redo samples (weight 4/20/2018)
+redo_weights <- read.csv("Data/EA_Data/20April2018_EA-bulk-redo-soilweights.csv")
+redo_vector <- redo_weights$sample_amt
+# Add missing sample weights
+er_redo$sample_amt <- redo_vector
+
+# Calculate actual C & N amounts
+er_redo$N_wt_mg <- as.numeric(as.character(er_redo$N_wt_mg))
+er_redo$C_wt_mg <- as.numeric(as.character(er_redo$C_wt_mg))
+
+# Recalc C & N weight percentages
+er_redo$N_wt_pct_recalc <- (er_redo$N_wt_mg / er_redo$sample_amt) * 100
+er_redo$C_wt_pct_recalc <- (er_redo$C_wt_mg / er_redo$sample_amt) * 100
+
+# Remove old N and C wt_pct columns, and rename the recalc columns
+er_redo <- subset(er_redo, select = -c(N_wt_pct, C_wt_pct))
+colnames(er_redo)[c(6,7)] <- c("N_wt_pct", "C_wt_pct")
+
+# Remove re-run samples in er_bulk_ed
+remove <- c("31-1", "31-2", "27-1", "27-2", "60-2", "40-1", "40-2")
+
+er_bulk_ed_removed <- er_bulk_ed[!(er_bulk_ed$sample_rep) %in% remove, ]
+```
+
+## Combine bulk, intermediate, and heavy fraction data
+```{r}
+# Row-bind with er_bulk_ed (make sure columns are correct)
+er_bulk_total <- rbind(er_redo, er_bulk_ed_removed)
+
+# Row-bind with er_int and er_heavy
+er_totalC_total <- rbind(er_bulk_total, er_int, er_heavy)
 
 ```
 
-
-## Prep bulk fraction data
+## Prep all fraction data (bulk, intermediate, heavy)
 ```{r}
-# Taking out bad 40's (retest this sample along with #60)
-er_bulk_ed <- er_bulk_ed[-c(1, 12), ]
-
 # Separate "sample-rep"
-er_bulk_ed <- er_bulk_ed %>%
-  separate(sample_id_corrected, c("ID", "rep"), "-")
+er_totalC_total <- er_totalC_total %>%
+  separate(sample_rep, c("ID", "rep", "composite_number"), "-")
 
-ggplot(er_bulk_ed) +
+er_totalC_total$ID <- as.numeric(er_totalC_total$ID)
+
+# Make column for composite
+er_totalC_total$composite <- ifelse(er_totalC_total$rep == "comp", "Y", "N")
+
+ggplot(er_totalC_total) +
   aes(x=ID, y=C_wt_pct, color=rep) +
   geom_point()
 
 # Average the sample reps
-er_bulk_av <- er_bulk_ed %>%
-  group_by(ID) %>%
-  summarize(C_mean = mean(C_wt_pct), N_mean = mean(N_wt_pct), C_sd = sd(C_wt_pct), N_sd = sd(N_wt_pct))
+er_totalC_av <- er_totalC_total %>%
+  group_by(ID, fraction, composite) %>%
+  summarize(C_mean_wt_percent = mean(C_wt_pct), N_mean_wt_percent = mean(N_wt_pct), C_sd = sd(C_wt_pct), N_sd = sd(N_wt_pct))
 
 # Read in sample key
 sample_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
@@ -96,182 +147,102 @@ sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
 #sample_key <- sample_key[order(sample_key$location, sample_key$rep), ]
 
 # Merge the total CN data with the sample key, using the common column "ID".
-total_bulk_cn <- merge(sample_key, er_bulk_av, by="ID")
-total_bulk_cn <- total_bulk_cn[order(total_bulk_cn$location, total_bulk_cn$rep, total_bulk_cn$top_cm), ]
+total_er_cn <- merge(sample_key, er_totalC_av, by="ID", all.y=TRUE)
+
+# Add date-year column
+total_er_cn$date <- "june_2017"
+
+# Adding info to intermediate composite samples
+# From October2017_EastRiver_CLS_sampleIDlist.xlsx
+#1-int-comp = MC1, 17-39cm
+#2-int-comp = MC1, 54-75cm
+#3-int-comp = MC2, 18-35cm
+#4-int-comp = MC2, 73-85cm
+#5-int-comp = MC3, 15-34cm
+#6-int-comp = MC3, 50-88cm
+#7-int-comp = MC3, 105-140cm
+
+ID <- c(1:7)
+location <- c("MC1", "MC1", "MC2", "MC2", "MC3", "MC3", "MC3")
+top_cm <- c(17, 54, 18, 73, 15, 50, 105)
+btm_cm <- c(39, 75, 35, 85, 34, 88, 140)
+rep <- rep(NA, 7)
+fraction <- rep("int", 7)
+composite <- rep("Y", 7)
+date <- rep("june_2017", 7)
+
+int_comp <- data.frame(ID, location, top_cm, btm_cm)
+int_comp$location <- as.character(int_comp$location)
+
+# Fill in missing data in total_er_cn
+total_er_cn_noNA <- left_join(total_er_cn, int_comp, by="ID") %>%
+  mutate(location = coalesce(location.x, location.y)) %>%
+  mutate(top_cm = coalesce(top_cm.x, btm_cm.y)) %>%
+  mutate(btm_cm = coalesce(btm_cm.x, btm_cm.y)) %>%
+  select(ID, location, rep, top_cm, btm_cm, fraction, composite, date, C_mean_wt_percent, N_mean_wt_percent, C_sd, N_sd)
+
+# Order the columns
+total_er_cn_noNA <- total_er_cn_noNA[order(total_er_cn_noNA$composite, total_er_cn_noNA$fraction, total_er_cn_noNA$location), ]
 
 #Export as csv
 #write.csv(total_bulk_cn, "Data/EA_data/25April2018_EA_bulk_processed.csv")
-
+#write.csv(total_er_cn_noNA, "Data/EA_data/EA_bulk_dens-fractions_2017_processed.csv")
 ```
 
-
-
-## Prep intermediate fraction data for Marco (March 2018)
+## C:N ratios (both uncorrected & corrected for fraction of total mass)
 ```{r}
-# take out standards, composite samples, and Evan's data (maybe need to look at composite samples because I didn't have enough intermediate samples to run individuals)
-er_int_short <- er_int[c(6:27), ]
-
-# Separate "sample-rep"
-er_int_short <- er_int_short %>%
-  separate(`sample-rep`, c("ID", "rep"), "-")
-
-# Average the sample reps
-er_int_short_test <- er_int_short %>%
-  group_by(ID) %>%
-  summarize(C_mean = mean(C_wt_pct), N_mean = mean(N_wt_pct), C_sd = sd(C_wt_pct), N_sd = sd(N_wt_pct))
-
-# Merge the total CN data with the sample key, using the common column "ID".
-total_int_cn <- merge(sample_key, er_int_short_test, by="ID")
-total_int_cn <- total_int_cn[order(total_int_cn$location, total_int_cn$rep, total_int_cn$top_cm), ]
-
-#Export as csv
-#write.csv(total_int_cn, "Data/EA_data/25April2018_EA_int_processed.csv")
-
-```
-
-
-## Prep heavy fraction data for Marco (March 2018)
-```{r}
-er_heavy_short <- er_heavy
-
-# Separate "sample-rep"
-er_heavy_short <- er_heavy_short %>%
-  separate(`sample-rep`, c("ID", "rep"), "-")
-
-# Average the sample reps
-er_heavy_short_test <- er_heavy_short %>%
-  group_by(ID) %>%
-  summarize(C_mean = mean(C_wt_pct), N_mean = mean(N_wt_pct), C_sd = sd(C_wt_pct), N_sd = sd(N_wt_pct))
-
-
-# Merge the total CN data with the sample key, using the common column "ID".
-total_heavy_cn <- merge(sample_key, er_heavy_short_test, by="ID")
-total_heavy_cn <- total_heavy_cn[order(total_heavy_cn$location, total_heavy_cn$rep, total_heavy_cn$top_cm), ]
-
-#Export as csv
-#write.csv(total_heavy_cn, "Data/EA_data/25April2018_EA_heavy_processed.csv")
-
-```
-
-
-## Merge bulk, intermediate, and heavy fraction total CN (not corrected for fraction of total mass)
-```{r}
-# Make fraction column
-#total_bulk_cn$frac <- "bulk"
-#total_int_cn$frac <- "int"
-#total_heavy_cn$frac <- "heavy"
-
 # Make C:N column
-total_bulk_cn$bulk_CN <- total_bulk_cn$C_mean / total_bulk_cn$N_mean
-total_int_cn$int_CN <- total_int_cn$C_mean / total_int_cn$N_mean
-total_heavy_cn$heavy_CN <- total_heavy_cn$C_mean / total_heavy_cn$N_mean
-
-# Remove all ID info except "ID", take out SD (will add back later)
-total_bulk_cn <- total_bulk_cn[, -c(8:9)] #leave in the sample location info in this one
-total_int_cn <- total_int_cn[, -c(2:5,8:9)]
-total_heavy_cn <- total_heavy_cn[, -c(2:5,8:9)]
-
-# rbind
-#total_cn <- rbind(total_bulk_cn, total_int_cn, total_heavy_cn)
-
-# Amend the column headers
-colnames(total_bulk_cn)[c(6:7)] <- c("bulk_C", "bulk_N")
-colnames(total_int_cn)[c(2:3)] <- c("int_C", "int_N")
-colnames(total_heavy_cn)[c(2:3)] <- c("heavy_C", "heavy_N")
-
-# Merge by ID
-total_cn <- merge(total_bulk_cn, total_int_cn, by="ID", all=TRUE)
-total_cn <- merge(total_cn, total_heavy_cn, by="ID", all=TRUE)
-
-total_cn <- total_cn[order(total_cn$location, total_cn$rep, total_cn$top_cm), ]
-
-
-# Export as csv
-#write.csv(total_cn, "Data/EA_data/25April2018_EA_total_cn_processed.csv")
-
-
-
-# Melt by frac
-#total_bulk_cn_melt <- melt(total_bulk_cn)
-#total_int_cn_melt <- melt(total_int_cn)
-#total_heavy_cn_melt <- melt(total_heavy_cn)
-
-# rbind
-#total_cn <- rbind(total_bulk_cn_melt, total_int_cn_melt, total_heavy_cn_melt)
-
-# Import composite data
-comp <- read_excel("October2017_EastRiver_CLS_sampleIDlist.xlsx")[-c(5,7,9, 25:66), -c(2,5:11)]
-colnames(comp)[c(1,3)] <- c("sample_label", "ID")
-
-comp$sample_label <- na.locf(comp$sample_label)
-comp$location <- na.locf(comp$location)
-
-comp <- comp %>%
-  separate(sample_label, c("number", "frac", "comp"), "-")
-
-comp$sample_label <- paste(comp$number, comp$comp, sep="-")
-
-comp <- comp[, -c(1:3)]
-colnames(comp)[1] <- "location_title"
-
-# Merge with composite data
-total_cn_comp <- merge(total_cn, comp, by="ID")
-
-# Average by comp
-total_cn_comp_av <- total_cn_comp %>%
-  group_by(sample_label, location_title) %>%
-  summarize(
-    bulk_C = mean(bulk_C), bulk_N = mean(bulk_N), bulk_CN = mean(bulk_CN),
-    int_C = mean(int_C, na.rm=TRUE), int_N = mean(int_N, na.rm=TRUE), int_CN = mean(int_CN, na.rm=TRUE),
-    heavy_C = mean(heavy_C), heavy_N = mean(heavy_N), heavy_CN = mean(heavy_CN))
+total_er_cn_noNA$CN <- total_er_cn_noNA$C_mean_wt_percent / total_er_cn_noNA$N_mean_wt_percent
 
 # Export as csv
 #write.csv(total_cn_comp_av, "Data/EA_data/25April2018_EA_total_cn_comp_processed.csv")
+#write.csv(total_er_cn_noNA, "Data/EA_data/EA_bulk_dens-fractions_CN_2017_processed.csv")
+
+# Corrected CN in intermediate and heavy fractions, as fraction of total mass
+dens.frac.merge <- read.csv("Data/0.processed_data/EA_dens-fractionation_2017_processed.csv")[,-c(1,3:6,11)]
+colnames(dens.frac.merge)[c(4,5)] <- c("top_cm", "btm_cm")
+dens.frac.merge$btm_cm <- as.numeric(dens.frac.merge$btm_cm)
+
+# Remove "b" from rep column
+dens.frac.merge$rep <- gsub("[^0-9\\.]", "", dens.frac.merge$rep)
+
+# Gathering data
+dens.frac.merge_long <- dens.frac.merge %>%
+  gather(fraction, frac_of_total, c(6:8))
+
+# Change fraction names
+dens.frac.merge_long$fraction <- ifelse(dens.frac.merge_long$fraction == "int_frac_percent", "int",
+                                         ifelse(dens.frac.merge_long$fraction == "heavy_frac_percent", "heav", "light"))
+
+# Merge with total_er_cn_noNA
+total_er_cn_dens_frac <- merge(dens.frac.merge_long, total_er_cn_noNA, all=TRUE)
+total_er_cn_dens_frac$date <- "june_2017"
+
+total_er_cn_dens_frac$frac_of_total[total_er_cn_dens_frac$fraction == "bulk"] <- 1
+
+total_er_cn_dens_frac$composite <- ifelse(total_er_cn_dens_frac$ID %in% c(1:7), "Y", "N")
+
+# Calculate %C and N by mass fraction, correct C:N ratios
+total_er_cn_dens_frac$C_percent_by_mass <- total_er_cn_dens_frac$C_mean_wt_percent * total_er_cn_dens_frac$frac_of_total
+total_er_cn_dens_frac$N_percent_by_mass <- total_er_cn_dens_frac$N_mean_wt_percent * total_er_cn_dens_frac$frac_of_total
+total_er_cn_dens_frac$CN_by_mass <- total_er_cn_dens_frac$C_percent_by_mass / total_er_cn_dens_frac$N_percent_by_mass
+
+ggplot(total_er_cn_dens_frac) +
+  aes(x=location, y=C_percent_by_mass, color=fraction) +
+  geom_boxplot() +
+  xlab("soil depth (cm)") + ylab("%C by mass fraction")
+
+# Order the columns
+total_er_cn_dens_frac <- total_er_cn_dens_frac[order(total_er_cn_dens_frac$location, total_er_cn_dens_frac$fraction, total_er_cn_dens_frac$composite), ]
+
+#Export as csv
+write.csv(total_er_cn_noNA, "Data/EA_data/EA_bulk_dens-fractions_mass-frac_2017_processed.csv")
+
 
 ```
 
-
-## Corrected CN in intermediate and heavy fractions, as fraction of total mass
+## Old code
 ```{r}
-
-# First, run EastRiver_densityfrac.rmd script
-
-# INTERMEDIATE FRACTION
-# Merge intermediate fraction CN data with density fraction data frame
-test_int <- merge(er_int_short_test, dens.frac.merge, by="ID")
-
-# Calculate %C by mass fraction
-test_int$C_per_by_mass <- test_int$C_mean * test_int$int_frac_per
-test_int$N_per_by_mass <- test_int$N_mean * test_int$int_frac_per
-test_int$CN_by_mass <- test_int$C_per_by_mass / test_int$N_per_by_mass
-
-ggplot(test_int) +
-  aes(x=mean.depth_cm, y=C_per_by_mass) +
-  geom_point() +
-  xlab("soil depth (cm)") + ylab("%C by mass fraction") + ggtitle("Intermediate fraction")
-
-# Get only relevant columns
-test_int_short <- test_int[, c(1, 18:20)]
-
-# HEAVY FRACTION
-# Merge heavy fraction CN data with density fraction data frame
-test_heavy <- merge(er_heavy_short_test, dens.frac.merge, by="ID")
-
-# Calculate %C by mass fraction
-test_heavy$C_per_by_mass <- test_heavy$C_mean * test_heavy$heavy_frac_per
-test_heavy$N_per_by_mass <- test_heavy$N_mean * test_heavy$int_frac_per
-test_heavy$CN_by_mass <- test_heavy$C_per_by_mass / test_heavy$N_per_by_mass
-
-# Figure
-ggplot(test_heavy) +
-  aes(x=mean.depth_cm, y=C_per_by_mass) +
-  geom_point()+
-  xlab("soil depth (cm)") + ylab("%C by mass fraction") + ggtitle("Heavy fraction")
-
-# Get only relevant columns
-test_heavy_short <- test_heavy[, c(1, 10:13, 18:20)]
-
-
 # Make summary tables as above
 
 # 1. As individual samples

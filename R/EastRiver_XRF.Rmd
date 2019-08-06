@@ -41,11 +41,15 @@ xrf <- subset(xrf, select=-c(H, He, Li, Be, B, C, N, O, F, Ne, Ar, Kr, Tc, Xe, P
 
 xrf_error <- subset(xrf_error, select=-c(3:22, 37, 38, 73, 74, 87, 88, 109, 110, 123, 124, 127:150, 151:158, 169:180, 183, 184))
 
-# Subset only Fe and Al
-xrf_alfe <- subset(xrf, select = c(id, Fe, Al))
-xrf_error_alfe <- subset(xrf_error, select = c(id, Fe, Fe.1, Al, Al.1))
+# Subset only Fe (%), Al (%), Ca (%), Mg (%), Si (%), P (%), Mn (ug/g), S (ug/g), Cl (ug/g)
+xrf_select <- subset(xrf, select = c(id, Fe, Al, Ca, Mg, Si, P, Mn, S, Cl))
+xrf_error_select <- subset(xrf_error, select = c(id, Fe, Fe.1, Al, Al.1, Ca, Ca.1, Mg, Mg.1, Si, Si.1, P, P.1, Mn, Mn.1, S, S.1, Cl, Cl.1))
 
-# Add units (% for Fe and Al)
-colnames(xrf_alfe)[2:3] <- c("Fe_per", "Al_per")
+# Add units
+colnames(xrf_select)[2:10] <- c("Fe_percent", "Al_percent", "Ca_percent", "Mg_percent", "Si_percent", "P_percent", "Mn_ug-g", "S_ug-g", "Cl_ug-g")
+
+colnames(xrf_error_select)[2:19] <- c("Fe_percent", "Fe_abs_error", "Al_percent", "Al_abs_error", "Ca_percent", "Ca_abs_error", "Mg_percent", "Mg_abs_error", "Si_percent", "Si_abs_error", "P_percent", "P_abs_error", "Mn_ug-g", "Mn_abs_error", "S_ug-g", "S_abs_error", "Cl_ug-g", "Cl_abs_error")
+
+write.csv(xrf_error_select, "xrf_2017_processed.csv")
 
 ```
