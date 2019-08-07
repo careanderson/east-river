@@ -174,9 +174,9 @@ phos_means$abs_corr[phos_means$extraction=="pp"] <- phos_means$abs[phos_means$ex
 
 
 # Use standard equation to convert numbers
-nit_means$conc <- (nit_means$abs_corr - 0.1433890) / 0.2351738
-amm_means$conc <- (amm_means$abs_corr - 0.083951923) / 0.009596154
-phos_means$conc <- (phos_means$abs_corr - 0.05399663) / 0.01163993
+nit_means$conc_umolar <- (nit_means$abs_corr - 0.1433890) / 0.2351738
+amm_means$conc_ppm <- (amm_means$abs_corr - 0.083951923) / 0.009596154
+phos_means$conc_umolar <- (phos_means$abs_corr - 0.05399663) / 0.01163993
 
 ```
 
@@ -185,9 +185,9 @@ phos_means$conc <- (phos_means$abs_corr - 0.05399663) / 0.01163993
 ```{r}
 
 # Convert negatives to zeros
-nit_means$conc[nit_means$conc < 0] <- 0
-amm_means$conc[amm_means$conc < 0] <- 0
-phos_means$conc[phos_means$conc < 0] <- 0
+nit_means$conc_umolar[nit_means$conc_umolar < 0] <- 0
+amm_means$conc_ppm[amm_means$conc_ppm < 0] <- 0
+phos_means$conc_umolar[phos_means$conc_umolar < 0] <- 0
 
 
 # Correct for sample amount, dilutions, etc.
@@ -196,19 +196,19 @@ phos_means$conc[phos_means$conc < 0] <- 0
 #(x TN)(mg L-1)*(1/14.0067) ((mmol mg-1)-1) = x mmol TN L-1
 
 # Nitrate in uM; convert to mmol/g (1um = 0.001mm)
-nit_means$conc_corr <- nit_means$conc * (0.01/0.33) * (0.001) #no dilution for any of the extractions
+nit_means$conc_corrected_mmol_g <- nit_means$conc_umolar * (0.01/0.33) * (0.001) #no dilution for any of the extractions
 
 # Ammonium in ppm; need to convert to mmol/g
-amm_means$conc_corr[amm_means$extraction=="h2o"] <- amm_means$conc[amm_means$extraction=="h2o"] * (0.01/0.33) * (1/18.039)  #no dilution
-amm_means$conc_corr[amm_means$extraction=="pp"] <- amm_means$conc[amm_means$extraction=="pp"] * (0.01/0.33)  * (1/18.039)  #no dilution
-amm_means$conc_corr[amm_means$extraction=="dith"] <- amm_means$conc[amm_means$extraction=="dith"] * (0.01/0.33) * 10 * (1/18.039) #1:10 dilution
-amm_means$conc_corr[amm_means$extraction=="hcl"] <- amm_means$conc[amm_means$extraction=="hcl"] * (0.01/0.33) * (1/18.039) #no dilution
+amm_means$conc_corrected_mmol_g[amm_means$extraction=="h2o"] <- amm_means$conc_ppm[amm_means$extraction=="h2o"] * (0.01/0.33) * (1/18.039)  #no dilution
+amm_means$conc_corrected_mmol_g[amm_means$extraction=="pp"] <- amm_means$conc_ppm[amm_means$extraction=="pp"] * (0.01/0.33)  * (1/18.039)  #no dilution
+amm_means$conc_corrected_mmol_g[amm_means$extraction=="dith"] <- amm_means$conc_ppm[amm_means$extraction=="dith"] * (0.01/0.33) * 10 * (1/18.039) #1:10 dilution
+amm_means$conc_corrected_mmol_g[amm_means$extraction=="hcl"] <- amm_means$conc_ppm[amm_means$extraction=="hcl"] * (0.01/0.33) * (1/18.039) #no dilution
 
 # Phosphate in uM; convert to mmol/g (1um = 0.001mm)
-phos_means$conc_corr[phos_means$extraction=="h2o"] <- phos_means$conc[phos_means$extraction=="h2o"] * (0.01/0.33) * (0.001) #no dilution
-phos_means$conc_corr[phos_means$extraction=="pp"] <- phos_means$conc[phos_means$extraction=="pp"] * (0.01/0.33) * (0.001) #no dilution
-phos_means$conc_corr[phos_means$extraction=="dith"] <- phos_means$conc[phos_means$extraction=="dith"] * (0.01/0.33) * (0.001) * 100 #1:100 dilution
-phos_means$conc_corr[phos_means$extraction=="hcl"] <- phos_means$conc[phos_means$extraction=="hcl"] * (0.01/0.33) * (0.001) * 10 #1:10 dilution
+phos_means$conc_corrected_mmol_g[phos_means$extraction=="h2o"] <- phos_means$conc_umolar[phos_means$extraction=="h2o"] * (0.01/0.33) * (0.001) #no dilution
+phos_means$conc_corrected_mmol_g[phos_means$extraction=="pp"] <- phos_means$conc_umolar[phos_means$extraction=="pp"] * (0.01/0.33) * (0.001) #no dilution
+phos_means$conc_corrected_mmol_g[phos_means$extraction=="dith"] <- phos_means$conc_umolar[phos_means$extraction=="dith"] * (0.01/0.33) * (0.001) * 100 #1:100 dilution
+phos_means$conc_corrected_mmol_g[phos_means$extraction=="hcl"] <- phos_means$conc_umolar[phos_means$extraction=="hcl"] * (0.01/0.33) * (0.001) * 10 #1:10 dilution
 
 
 # Merge with sample key
@@ -227,32 +227,45 @@ sample_key <- sample_key %>%
 sample_key$top_cm <- as.numeric(sample_key$top_cm)
 sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
 
-# Merge the MP-ICP-AES data with the sample key, using the common column "ID".
+# Merge the nutrient data with the sample key, using the common column "ID".
 nit_all_merge <- merge(nit_means, sample_key, by="ID")
 amm_all_merge <- merge(amm_means, sample_key, by="ID")
 phos_all_merge <- merge(phos_means, sample_key, by="ID")
 
-```
 
+# Merge all nutrients; units mmol/g
+colnames(nit_all_merge)[c(3:6)] <- c("nit_abs", "nit_abs_corr", "nit_conc_umolar","nit_conc_corrected_mmol_g")
+colnames(amm_all_merge)[c(3:6)] <- c("amm_abs", "amm_abs_corr", "amm_conc_ppm","amm_conc_corrected_mmol_g")
+colnames(phos_all_merge)[c(3:6)] <- c("phos_abs", "phos_abs_corr", "phos_conc_ppm", "phos_conc_corrected_mmol_g")
+
+nutrients_all_merge <- merge(nit_all_merge, amm_all_merge)
+nutrients_all_merge <- merge(nutrients_all_merge, phos_all_merge)
+
+# Write csv
+#write.csv(nutrients_all_merge, "Data/0.processed_data/seq_extraction_2017_nutrients_processed.csv")
+```
 
 ## Sum ammonium and nitrate (total inorganic N), subtract from TN to get TON
 ```{r}
-# Units mmol/g
-colnames(nit_all_merge)[c(3:6)] <- c("nit_abs", "nit_abs_corr", "nit_conc","nit_conc_corr")
-colnames(amm_all_merge)[c(3:6)] <- c("amm_abs", "amm_abs_corr", "amm_conc","amm_conc_corr")
 
 inorgN_all_merge <- merge(nit_all_merge, amm_all_merge)
 inorgN_all_merge$inorgN_sum <- -999
-inorgN_all_merge$inorgN_sum <- inorgN_all_merge$nit_conc_corr + inorgN_all_merge$amm_conc_corr
+inorgN_all_merge$inorgN_sum <- inorgN_all_merge$nit_conc_corrected_mmol_g + inorgN_all_merge$amm_conc_corrected_mmol_g
 
-all_n_merge <- merge(inorgN_all_merge, TN_samples, by=c("ID", "extraction"))
+TN_samples <- read.csv("Data/0.processed_data/seq_extraction_2017_toc-tn-mp_processed.csv")
+TN_samples_onlyN <- subset(TN_samples, element %in% "Fe")
 
-all_n_merge$TON <- -999
-all_n_merge$TON <- all_n_merge$mol_n_per_g - all_n_merge$inorgN_sum
+all_n_merge <- merge(inorgN_all_merge, TN_samples_onlyN, by=c("ID", "extraction", "top_cm", "btm_cm", "location", "rep"), all.y=TRUE)
+
+all_n_merge$TON_mmol_g <- -999
+all_n_merge$TON_mmol_g <- all_n_merge$mmol_n_g - all_n_merge$inorgN_sum
+
+# Convert negatives to zeros
+all_n_merge$TON_mmol_g[all_n_merge$TON_mmol_g < 0] <- 0
 
 # Plot of TON vs. soil depth, by extraction
 ggplot(all_n_merge) +
-  aes(x=top_cm, y=TON) +
+  aes(x=top_cm, y=TON_mmol_g) +
   geom_point() +
   facet_wrap(~extraction, scales="free")
 colnames(all_n_merge)
@@ -265,7 +278,7 @@ all_n_merge$depth_category <- ifelse(all_n_merge$top_cm < 40, "shallow", ifelse(
 all_n_merge$depth_category <- factor(all_n_merge$depth_category, levels = c("shallow", "subsurface", "deep"))
 
 # Melt data
-n_melt <- melt(all_n_merge, id=c("ID", "extraction", "location", "rep", "top_cm", "btm_cm", "dilution_tn", "depth_category"))
+n_melt <- melt(all_n_merge, id=c("ID", "extraction", "location", "rep", "top_cm", "btm_cm", "depth_category"))
 
 # Change labels of sequential extractions
 n_melt$extraction2 <- factor(n_melt$extraction, levels = c("dith", "hcl", "pp", "h2o"))
@@ -273,8 +286,8 @@ levels(n_melt$extraction2) <- c("Dithionite",  "HCl", "Pyrophosphate", "Water")
 
 # Make figure for TON vs. TIN; bar plot like ICR data
 # Stacked bar plots
-n1 <- ggplot(subset(n_melt, depth_category %in% "shallow" & variable %in% c("mol_n_per_g", "TON"))) +
-  aes(y=value, x=extraction2, fill=variable) +
+n1 <- ggplot(subset(n_melt, depth_category %in% "shallow" & variable %in% c("mmol_n_g", "TON_mmol_g"))) +
+  aes(y=as.numeric(value), x=extraction2, fill=variable) +
   geom_bar(stat="identity") +
   coord_flip() +
   xlab("Shallow") + ylab("") +
@@ -286,16 +299,16 @@ n1 <- ggplot(subset(n_melt, depth_category %in% "shallow" & variable %in% c("mol
         legend.title=element_text(size=30),
         legend.text=element_text(size=30),
         axis.text.y = element_text(angle = 60, vjust = 0.5, hjust=0.85)) +
-    scale_fill_manual(name="",
-                      breaks=c("TON", "mol_n_per_g"),
-                      labels=c("Organic", "Inorganic"),
-                      values=c("black","#0072B2"))
+  scale_fill_manual(name="",
+                    breaks=c("TON_mmol_g", "mmol_n_g"),
+                    labels=c("Organic", "Inorganic"),
+                    values=c("black","#0072B2"))
 
-n2 <- ggplot(subset(n_melt, depth_category %in% "subsurface" & variable %in% c("mol_n_per_g", "TON"))) +
-  aes(y=value, x=extraction2, fill=variable) +
+n2 <- ggplot(subset(n_melt, depth_category %in% "subsurface" & variable %in% c("mmol_n_g", "TON_mmol_g"))) +
+  aes(y=as.numeric(value), x=extraction2, fill=variable) +
   geom_bar(stat="identity") +
   coord_flip() +
-  xlab("Subsurface") + ylab(expression(Nitrogen~(mmol~g^-1))) +
+  xlab("Subsurface") + ylab(expression(Total~N~(mmol~g^-1))) +
   theme_bw() +
   theme(axis.text = element_text(size = 25),
         axis.title = element_text(size = 35),
@@ -305,32 +318,10 @@ n2 <- ggplot(subset(n_melt, depth_category %in% "subsurface" & variable %in% c("
         legend.text=element_text(size=30),
         axis.text.y = element_text(angle = 60, vjust = 0.5, hjust=0.85)) +
     scale_fill_manual(name="",
-                      breaks=c("TON", "mol_n_per_g"),
+                      breaks=c("TON_mmol_g", "mmol_n_g"),
                       labels=c("Organic", "Inorganic"),
                       values=c("black","#0072B2"))
 
 #Plot together with shared legend
 ggarrange(n1, n2, ncol=1, nrow=2, common.legend = TRUE, legend="right")
-```
-
-
-## Plots
-```{r}
-ggplot(nit_all_merge) +
-  aes(x=top_cm, y=nit_conc_corr) +
-  geom_point() +
-  ylab("nitrate (uM/g soil)") +
-  facet_wrap(~extraction, scales = "free")
-
-ggplot(amm_all_merge) +
-  aes(x=top_cm, y=amm_conc_corr) +
-  geom_point() +
-  ylab("ammonium (mg/L/g soil)") +
-  facet_wrap(~extraction, scales = "free")
-
-ggplot(phos_all_merge) +
-  aes(x=top_cm, y=conc_corr) +
-  geom_point() +
-  ylab("phosphate (uM/g soil)") +
-  facet_wrap(~extraction, scales = "free")
 ```

@@ -43,7 +43,6 @@ TOC_samples$c_ppm_corrected <- TOC_samples$c_ppm * 0.47
 
 ```
 
-
 ## Merge with MP-ICP-AES data
 ```{r}
 mp <- read.csv("Data/0.processed_data/seq_extraction_2017_mp-aes_processed.csv")
