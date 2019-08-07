@@ -82,7 +82,7 @@ mp_total <- merge(mp_samples, sample_key, by="ID")
 # Per 10 ml, per 0.33g soil, 2x dilution (need exact weights and also correct volumes, different for each extraction)
 mp_total$Concentration_corrected <- (mp_total$Concentration * 2) * (0.01/0.33)
 
-# Convert to e.g., mmol Fe / g soil (divide by formula weight; divide by 1000 to cancel mg;  multiply by 1000 to get into mmol)
+# Convert to e.g., mmol Fe / g soil (divide by formula weight, mg/mmol)
 mp_total$Concentration_corrected[mp_total$Element.Label=="Al"] <- mp_total$Concentration_corrected[mp_total$Element.Label=="Al"] * (1/26.981539)
 
 mp_total$Concentration_corrected[mp_total$Eleemnt.Label=="Ca"] <- mp_total$Concentration_corrected[mp_total$Element.Label=="Ca"] * (1/40.078)
