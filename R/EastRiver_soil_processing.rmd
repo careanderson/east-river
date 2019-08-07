@@ -71,7 +71,7 @@ soil.sieved$rocks_BAG <- as.factor(soil.sieved$rocks_BAG)
 soil.sieved$roots_mg <- soil.sieved$roots_g * 1000
 
 # Bag averages to subtract
-z <- mean(c("")) #ziploc gallon bag #use same weight as up&up bags
+#z <- mean(c("")) #ziploc gallon bag #use same weight as up&up bags
 u <- mean(c(11.22, 11.28, 11.28, 11.25)) #up & up gallon bag
 q <- mean(c(4.84, 4.81, 4.84, 4.83)) #ziploc quart bag
 
@@ -90,7 +90,7 @@ soil.sieved$rock_frac <- soil.sieved$rocks_g /
   (soil.sieved$soil2mm_g + soil.sieved$rocks_g + soil.sieved$roots_g)
   
 # Root biomass (mg roots/g soil)
-soil.sieved$root_frac <- soil.sieved$roots_mg / 
+soil.sieved$root_frac <- soil.sieved$roots_g / 
   (soil.sieved$soil2mm_g_final)
 
 # Split the sample name into location (MC1-3) and rep (b1-3)
@@ -99,20 +99,20 @@ soil.sieved <- soil.sieved %>%
 
 # Split the depth into top/bottom
 soil.sieved <- soil.sieved %>%
-  separate(depth_cm, c("top", "bottom"), sep="-")
+  separate(depth_cm, c("top_cm", "bottom_cm"), sep="-")
 
 # Make "top" and "bottom" columns numeric
-soil.sieved[,c("top","bottom")] <- apply(soil.sieved[,c("top","bottom")], 2,
+soil.sieved[,c("top_cm","bottom_cm")] <- apply(soil.sieved[,c("top_cm","bottom_cm")], 2,
                                           function(x) as.numeric(as.character(x)))
 # Take the mean of top/bottom depths (change to weighted mean?)
-soil.sieved$mean.depth_cm <- rowMeans(subset(soil.sieved, select = c(top, bottom)), na.rm = TRUE)
+soil.sieved$mean.depth_cm <- rowMeans(subset(soil.sieved, select = c(top_cm, bottom_cm)), na.rm = TRUE)
 
 # Write processed datasheet
-soil.sieved.print <- soil.sieved[,c("ID","location","rep","top","bottom","mean.depth_cm","soil2mm_g_final","rocks_g_final","roots_mg","soil_frac","rock_frac","root_frac")]
+soil.sieved.print <- soil.sieved[,c("ID","location","rep","top_cm","bottom_cm","mean.depth_cm","soil2mm_g_final","rocks_g_final","roots_mg","soil_frac","rock_frac","root_frac")]
 
-soil.sieved.print <- soil.sieved.print[with(soil.sieved.print, order(location,rep,top)),]
+soil.sieved.print <- soil.sieved.print[with(soil.sieved.print, order(location,rep,top_cm)),]
 
-#write.csv(soil.sieved.print, "June2017_EastRiver_soil_processed.csv")
+#write.csv(soil.sieved.print, "Data/0.processed_data/June2017_EastRiver_soil_processed.csv")
 ```
 
 ## 4. Figures of 2mm fraction, root biomass
@@ -146,7 +146,7 @@ ggplot(soil.sieved) +
   geom_point() +
   geom_smooth(method="lm") +
   scale_y_reverse() +
-  xlab("Log root biomass per g sieved soil (log(mg root/g soil))") +
+  xlab("Log root biomass per g sieved soil (log(g root/g soil))") +
   ylab("Soil depth (cm)") +
   theme_bw() +
   theme(axis.text = element_text(size = 25),
