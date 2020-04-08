@@ -33,7 +33,9 @@ read_excel_allsheets <- function(filename) {
 }
 
 mysheets <- read_excel_allsheets('Data/2018_fielddata/11Dec2018_MCT2 Instrumentation and Sampling.xlsx')
+mysheets2 <- read_excel_allsheets('Data/2019_fielddata/2019-10-22_field_monitoring_2019.xlsx')
 
+# 2018 data
 rhizon_key <- as.data.frame(mysheets[1])
 rhizon_vials <- as.data.frame(mysheets[2])
 solid_key <- as.data.frame(mysheets[3])
@@ -43,7 +45,7 @@ flux <- as.data.frame(mysheets[6])
 redox_key <- as.data.frame(mysheets[7])
 redox <- as.data.frame(mysheets[8])
 
-# Column names
+# Column names 2018
 names(rhizon_key) <- gsub(pattern = "Rhizon.Probe.Key.", replacement = "", x = names(rhizon_key))
 names(rhizon_vials) <- gsub(pattern = "Rhizon_vials.", replacement= "", x=names(rhizon_vials))
 names(solid_key) <- gsub(pattern = "Solid.Sampling.Key.", replacement = "", x = names(solid_key))
@@ -53,63 +55,99 @@ names(flux) <- gsub(pattern = "LI.COR.Data.", replacement = "", x = names(flux))
 names(redox_key) <- gsub(pattern = "Redox.Key.", replacement = "", x = names(redox_key))
 names(redox) <- gsub(pattern = "Redox.Data.", replacement = "", x = names(redox))
 
+# 2019 data
+flux2019 <- as.data.frame(mysheets2[3])
+redox2019 <- as.data.frame(mysheets2[1])
+well_data2019 <- as.data.frame(mysheets2[4])
+solid_key2019 <- as.data.frame(mysheets2[2])
+
+# Column names 2019
+names(flux2019) <- gsub(pattern = "licor_data.", replacement = "", x = names(flux2019))
+names(redox2019) <- gsub(pattern = "redox_data.", replacement= "", x=names(redox2019))
+names(well_data2019) <- gsub(pattern = "well_data.", replacement = "", x = names(well_data2019))
+names(solid_key2019) <- gsub(pattern = "soil_sampling.", replacement = "", x = names(solid_key2019))
 ```
 
 ## Tidy flux data
 ```{r}
-# Change flux column names
-colnames(flux)[c(4,5)] <- c("collar", "temp_C")
+# Change flux 2018 column names to match 2019
+colnames(flux) <- c("date", "time", "location_mct2", "collar_number", "temp_C", "moisture", "rep1", "rep2", "rep3", "notes")
 
-# as.numeric
-flux$Moisture <- as.numeric(flux$Moisture)
-flux$CO2.Rep.1 <- as.numeric(flux$CO2.Rep.1)
-flux$CO2.Rep.2 <- as.numeric(flux$CO2.Rep.2)
-flux$CO2.Rep.3 <- as.numeric(flux$CO2.Rep.3)
+# add "MCT2-" to flux2019 location column
+flux2019$location_mct2 <- sub("^", "MCT2-", flux2019$location_mct2)
 
-flux$Location <- as.factor(flux$Location)
+# Change column structures
+flux[, c("moisture", "rep1", "rep2", "rep3")] <-
+  as.numeric(as.character(unlist(flux[c("moisture", "rep1", "rep2", "rep3")])))
+flux$location_mct2 <- as.factor(flux$location_mct2)
+  
+flux2019[,c("time", "temp_C","v1", "v2", "v3", "v4", "rep1", "rep2", "rep3")] <- 
+  as.numeric(as.character(unlist(flux2019[,c("time", "temp_C","v1", "v2", "v3", "v4", "rep1", "rep2", "rep3")])))
 
 # Make datetime column
-flux$Date <- format(flux$Date, format = "%m/%d/%Y")
-flux$Time <- format(flux$Time, format = "%H:%M")
+flux$date <- format(flux$date, format = "%m/%d/%Y")
+flux$time <- format(flux$time, format = "%H:%M")
 flux$datetime <- -999
-flux$datetime <- as.POSIXct(paste(flux$Date, flux$Time), format="%m/%d/%Y %H:%M")
+flux$datetime <- as.POSIXct(paste(flux$date, flux$time), format="%m/%d/%Y %H:%M")
+
+flux2019$date <- format(flux2019$date, format = "%m/%d/%Y")
+#force flux2019$time = 12:00:00
+flux2019$time <- "12:00:00"
+flux2019$time <- chron::times(flux2019$time)
+flux2019$datetime <- as.POSIXct(paste(flux2019$date, flux2019$time), format="%m/%d/%Y %H:%M")
 
 # Flux average (To do: exclude outliers based on SD)
 flux$flux.av <- rowMeans(flux[, c(7,8,9)], na.rm = TRUE)
+flux2019$flux.av <- rowMeans(flux2019[, c(10, 11, 12)], na.rm = TRUE)
 
 # Merge flux with licor key
-colnames(licor_key)[2] <- "collar"
+colnames(licor_key) <- c("location_mct2", "collar_number", "environment", "observed_moisture", "offset_height_cm")
 flux_total <- merge(flux, licor_key)
+flux_total2019 <- merge(flux2019, licor_key)
 ```
 
 ## Tidy redox data
 ```{r}
 redox$Probe[redox$Probe == "8b"] <- 8
 
+# Changing column names
+colnames(redox) <- c("date", "time", "location_mct2", "probe", "mv1", "mv2")
+# Extracting time from redox 2018
+redox$time <- strftime(redox$time, format = "%H:%M", tz="UTC")
 # Adding arbitrary sampling times to Christian's redox sampling
-redox$Time[redox$Date %in% c("09/22/2018", "09/11/2018", "08/26/2018")] <- "12:00"
+redox$time[redox$date %in% c("09/22/2018", "09/11/2018", "08/26/2018")] <- "12:00"
            
 # Make datetime column
-redox$Date <- format(redox$Date, format = "%m/%d/%Y")
-redox$Date[redox$Date == "05/29/2018"] <- ("05/30/2018") #Change 5/29 to 5/30 to match with licor
-redox$Time <- format(redox$Time, format = "%H:%M")
+redox$date <- format(redox$date, format = "%m/%d/%Y")
+redox$date[redox$date == "05/29/2018"] <- ("05/30/2018") #Change 5/29 to 5/30 to match with licor
 redox$datetime <- -999
-redox$datetime <- as.POSIXct(paste(redox$Date, redox$Time), format="%m/%d/%Y %H:%M")
+redox$datetime <- as.POSIXct(paste(redox$date, redox$time), format="%m/%d/%Y %H:%M")
+
+redox2019$date <- format(redox2019$date, format = "%m/%d/%Y")
+redox2019$time <- "12:00"
+redox2019$datetime <- -999
+redox2019$datetime <- as.POSIXct(paste(redox2019$date, redox2019$time), format="%m/%d/%Y %H:%M")
+
+# add "MCT2-" to redox2019 location column
+redox2019$location_mct2 <- sub("^", "MCT2-", redox2019$location_mct2)
 
 # Merge with redox key
-colnames(redox_key)[4] <- "depth_cm"
+colnames(redox_key) <- c("location_mct2", "probe", "color", "depth_cm")
 redox_total <- merge(redox, redox_key)
+redox_total2019 <- merge(redox2019, redox_key)
 
 # Redox average
-redox_total$Uncorrected.1..mV. <- as.numeric(redox_total$Uncorrected.1..mV.)
-redox_total$Uncorrected.2..mV. <- as.numeric(redox_total$Uncorrected.2..mV.)
+redox_total$mv1 <- as.numeric(redox_total$mv1)
+redox_total$mv2 <- as.numeric(redox_total$mv2)
 redox_total$redox_av <- rowMeans(redox_total[, c(5,6)], na.rm = TRUE)
 
 # Corrected redox values (add 254)
 redox_total$redox_av.corrected <- redox_total$redox_av + 254
+redox_total2019$redox_av.corrected <- redox_total2019$mv_uncorrected + 254
 
 # Aggregate depths (average of duplicate/triplicates)
-redox_av.means <- aggregate(redox_av.corrected~Location+datetime+Date+depth_cm, redox_total, mean)
+redox_av.means <- aggregate(redox_av.corrected~location_mct2+datetime+date+depth_cm, redox_total, mean)
+redox_av.means2019 <- aggregate(redox_av.corrected~location_mct2+datetime+date+depth_cm, redox_total2019, mean)
 
 ```
 
@@ -118,7 +156,10 @@ redox_av.means <- aggregate(redox_av.corrected~Location+datetime+Date+depth_cm, 
 # Merge CO2 flux and redox
 #redox_av.means$datetime <- NULL #might need to add this back in, but it messes up redox_av.means if included.
 redox_av.means$depth_cm <- as.factor(redox_av.means$depth_cm)
-flux_redox <- merge(flux_total, redox_av.means, by=c("Date", "Location"))
+redox_av.means2019$depth_cm <- as.factor(redox_av.means2019$depth_cm)
+
+flux_redox <- merge(flux_total, redox_av.means, by=c("date", "location_mct2"))
+flux_redox2019 <- merge(flux_total2019, redox_av.means2019, by=c("date", "location_mct2"))
 ```
 
 ## Merge with water table depth data
@@ -137,8 +178,8 @@ flux_watertable$date <- xtfrm(flux_watertable$date)
 ## Figures
 ```{r}
 ## Flux figures
-ggplot(subset(flux_total)) +
-  aes(x=datetime, y=flux.av) +
+g <- ggplot(subset(flux_total)) +
+  aes(x=datetime, y=flux.av, color = moisture) + # adding color = moisture for dissertation proposal figure
   geom_point() +
   geom_smooth() +
   ylab("Soil respiration (CO2 flux)") +
@@ -148,10 +189,50 @@ ggplot(subset(flux_total)) +
         strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
-        axis.title.x=element_blank()) +
-  facet_wrap(~Location)
+        axis.title.x=element_blank(),
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 20)) +
+  facet_wrap(~location_mct2)
 
-ggplot(subset(flux_total)) +
+flux_total2019$date <- as.Date(flux_total2019$date, format = "%m/%d/%y")
+flux_total$date <- as.Date(flux_total$date, format = "%m/%d/%y")
+
+
+ggplot(subset(flux_total2019, rep3 > 0 & rep3 < 10)) +
+  aes(x=date, y=rep3) + # adding color = moisture for dissertation proposal figure
+  geom_point() +
+  geom_smooth() +
+  ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        strip.text.x = element_text(size = 20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 20)) +
+  facet_wrap(~location_mct2)
+
+ggplot(subset(flux_total, rep3 > 0 & rep3 < 10)) +
+  aes(x=date, y=rep3) + # adding color = moisture for dissertation proposal figure
+  geom_point() +
+  geom_smooth() +
+  ylab("Soil respiration (CO2 flux)") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        strip.text.x = element_text(size = 20),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 20)) +
+  facet_wrap(~location_mct2)
+
+#ggsave(file="flux-2018-moisture.pdf", g, width = 10, height = 4, units = "in")
+
+ggplot(subset(flux_total)) + #flux_total2019
   aes(x=temp_C, y=flux.av) +
   geom_point() +
   geom_smooth() +
@@ -162,10 +243,10 @@ ggplot(subset(flux_total)) +
         strip.text.x = element_text(size = 25),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  facet_wrap(~Location)
+  facet_wrap(~location_mct2)
 
 ggplot(subset(flux_total)) +
-  aes(x=Moisture, y=flux.av, color=as.POSIXct(Date, format= "%m/%d/%Y")) + #, color=Environment
+  aes(x=moisture, y=flux.av, color=as.POSIXct(date, format= "%m/%d/%Y")) + #, color=Environment
   geom_point() +
   geom_smooth() +
   xlab("Soil moisture (volumetric)") + ylab("Soil respiration (CO2 flux)") +
@@ -178,10 +259,10 @@ ggplot(subset(flux_total)) +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   guides(color=guide_legend(title="Date")) +
-  facet_wrap(~Location)
+  facet_wrap(~location_mct2)
 
 ggplot(subset(flux_total)) +
-  aes(x=as.POSIXct(Time, format= "%H:%M"), y=flux.av, color=as.POSIXct(Time, format= "%H:%M")) +
+  aes(x=as.POSIXct(time, format= "%H:%M"), y=flux.av, color=as.POSIXct(time, format= "%H:%M")) +
   geom_point() +
   geom_smooth() +
   xlab("Date") + ylab("Soil respiration (CO2 flux)") +
@@ -190,10 +271,10 @@ ggplot(subset(flux_total)) +
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  facet_wrap(~Location)
+  facet_wrap(~location_mct2)
 
 ## Redox figures
-ggplot(redox_total) +
+ggplot(redox_total2019) +
   aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
   geom_point() +
   geom_smooth() +
@@ -206,30 +287,28 @@ ggplot(redox_total) +
         legend.text=element_text(size=20),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  facet_wrap(~Location) +
+  facet_wrap(~location_mct2) +
   guides(color=guide_legend(title="Soil depth (cm)"))
 
-ggplot(subset(redox_av.means)) +
+ggplot(subset(redox_av.means2019)) +
   aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
- # scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
-  geom_point() +
-  geom_smooth() +
+  #scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
+  geom_point() +  geom_smooth() +
   xlab("Date") + ylab("Redox potential (mV)") +
   theme_bw() +
-  theme(axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25),
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank()) +
   guides(color=guide_legend(title="Soil depth (cm)")) +
-  facet_wrap(~Location)
+  facet_wrap(~location_mct2)
 
 ## Flux and redox figures
 ggplot(flux_redox) +
-  aes(x=redox_av.corrected, y=Moisture) +
+  aes(x=redox_av.corrected, y=moisture) +
   geom_point() +
   facet_wrap(~depth_cm)
-
 
 ggplot(flux_redox) +
   aes(x=redox_av.corrected, y=flux.av) +
@@ -238,22 +317,22 @@ ggplot(flux_redox) +
   facet_wrap(~depth_cm, scales="free")
 
 ggplot(flux_redox) +
-  aes(x=redox_av.corrected, y=flux.av, color=Moisture) +
+  aes(x=redox_av.corrected, y=flux.av, color=moisture) +
   geom_point() +
 #  geom_smooth() +
   facet_wrap(~depth_cm, scales="free")
 
 ggplot(subset(flux_redox, redox_av.corrected < 0)) +
-  aes(x=redox_av.corrected, y=flux.av, color=Moisture) +
+  aes(x=redox_av.corrected, y=flux.av, color=moisture) +
   geom_point() +
 #  geom_smooth() +
-  facet_wrap(~depth_cm + Location, scales="free")
+  facet_wrap(~depth_cm + location_mct2, scales="free")
 
 ggplot(subset(flux_redox, depth_cm == 100)) +
-  aes(x=redox_av.corrected, y=flux.av, color=Moisture) +
+  aes(x=redox_av.corrected, y=flux.av, color=moisture) +
   geom_point() +
 #  geom_smooth() +
-  facet_wrap(~depth_cm + Location, scales="free")
+  facet_wrap(~depth_cm + location_mct2, scales="free")
 
 ## Flux, redox, water table depth figures
 ggplot(flux_watertable) +
@@ -335,7 +414,7 @@ ggplot(flux_total) +
 # p1 = flux vs. time from 5/30 thru 9/22
 # p2 = river height vs. time from 5/30 thru 9/22
 
-p1 <- ggplot(subset(flux_total, Location == "MCT2-1")) +
+p1 <- ggplot(subset(flux_total, location_mct2 == "MCT2-1")) +
   aes(x=datetime, y=flux.av) +
   geom_point() +
   geom_smooth() +
@@ -375,7 +454,7 @@ grid.newpage()
 grid.draw(g)
 
 # Redox
-ggplot(subset(redox_av.means, Location == "MCT2-1" & depth_cm %in% c(15, 70, 100))) +
+ggplot(subset(redox_av.means, location_mct2 == "MCT2-1" & depth_cm %in% c(15, 70, 100))) +
   aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
   scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
   geom_point() +
@@ -391,15 +470,7 @@ ggplot(subset(redox_av.means, Location == "MCT2-1" & depth_cm %in% c(15, 70, 100
   guides(color=guide_legend(title="Soil depth (cm)"))
 ```
 
-
-## Test merge of rhizon and well data (TOC, ICP)
-```{r}
-
-
-```
-
-
-## DOE PI meeting poster for May 2019
+## DOE PI meeting poster for May 2019, and GCC poster for November 2019
 ```{r}
 # Need stacked plots of these variables over time:
 # CO2 flux
@@ -410,6 +481,11 @@ ggplot(subset(redox_av.means, Location == "MCT2-1" & depth_cm %in% c(15, 70, 100
 
 # Make sure dates line up; put date on bottom graph; make legends match (same titles, color, etc.)
 lims <- as.POSIXct(strptime(c("2018-06-02 00:00:00", "2018-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+lims_2018 <- as.POSIXct(strptime(c("2018-06-02 00:00:00", "2018-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+lims_2019 <- as.POSIXct(strptime(c("2019-06-02 00:00:00", "2019-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
 
 # Name transect positions 1, 3, 4
 position_names <- c(
@@ -439,6 +515,7 @@ p1 <- ggplot(subset(wtd_interp, Location %in% c("MCT2-1", "MCT2-3"))) +
         strip.text = element_blank()) +
   xlim(lims)
 
+# acclima moisture 2018
 p2 <- ggplot(subset(acclima_av, location %in% c("MCT2-1","MCT2-3") & depth_cm %in% c("30", "70"))) +
   aes(x=date, y=moisture_mean, color=depth_cm) +
   geom_point(size = 1) +
@@ -455,15 +532,16 @@ p2 <- ggplot(subset(acclima_av, location %in% c("MCT2-1","MCT2-3") & depth_cm %i
         axis.title.x=element_blank(),
         legend.position = "none",
         strip.text = element_blank()) +
-  xlim(lims) +
+  xlim(lims_2018) +
   scale_color_manual(values=cbPalette)
 
-p3 <- ggplot(subset(redox_av.means, Location %in% c("MCT2-1","MCT2-3") & depth_cm %in% c("30", "70", "100"))) +
-  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
-  geom_point(size=2) + geom_smooth(size=1) +
-  ylab("Eh (mV)") +
+# acclima moisture 2019
+p2b <- ggplot(subset(acclima_av, location %in% c("MCT2-1","MCT2-3") & depth_cm %in% c("30", "70"))) +
+  aes(x=date, y=moisture_mean, color=depth_cm) +
+  geom_point(size = 1) +
+  xlab("Time") + ylab("moisture (%)") +
   guides(color=guide_legend(title="Soil depth (cm)")) +
-  facet_wrap(~Location, labeller = as_labeller(position_names)) +
+  facet_wrap(~location, labeller = as_labeller(position_names)) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 20),
         axis.text.x = element_blank(),
@@ -474,14 +552,99 @@ p3 <- ggplot(subset(redox_av.means, Location %in% c("MCT2-1","MCT2-3") & depth_c
         axis.title.x=element_blank(),
         legend.position = "none",
         strip.text = element_blank()) +
-  xlim(lims) +
+  xlim(lims_2019) +
   scale_color_manual(values=cbPalette)
 
-p4 <- ggplot(subset(flux_total, Location %in% c("MCT2-1","MCT2-3"))) +
+# redox 2018
+p3 <- ggplot(subset(redox_av.means, location_mct2 %in% c("MCT2-1","MCT2-3") & depth_cm %in% c("30", "70", "100"))) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  geom_point(size=2) + geom_smooth(size=1) +
+  ylab("Eh (mV)") +
+  ylim(-250, 500) +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~location_mct2, labeller = as_labeller(position_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2018) +
+  scale_color_manual(values=cbPalette)
+
+p3.2 <- ggplot(subset(redox_av.means, location_mct2 %in% c("MCT2-3") & depth_cm %in% c("30", "70", "100"))) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  geom_point(size=2) + geom_smooth(size=1) +
+  ylab("Eh (mV)") +
+  ylim(-250, 500) +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~location_mct2, labeller = as_labeller(position_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2018) +
+  scale_color_manual(values=cbPalette)
+
+# redox 2019
+p3b <- ggplot(subset(redox_av.means2019, location_mct2 %in% c("MCT2-1","MCT2-3") & depth_cm %in% c("30", "70", "100"))) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  geom_point(size=2) + geom_smooth(size=1) +
+  ylab("Eh (mV)") +
+  ylim(-250, 500) +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~location_mct2, labeller = as_labeller(position_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2019) +
+  scale_color_manual(values=cbPalette)
+
+p3b.2 <- ggplot(subset(redox_av.means2019, location_mct2 %in% c("MCT2-3") & depth_cm %in% c("30", "70", "100"))) +
+  aes(x=datetime, y=redox_av.corrected, color=as.factor(depth_cm)) +
+  geom_point(size=2) + geom_smooth(size=1) +
+  ylab("Eh (mV)") +
+  ylim(-250, 500) +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~location_mct2, labeller = as_labeller(position_names)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2019) +
+  scale_color_manual(values=cbPalette)
+
+
+# flux 2018
+p4 <- ggplot(subset(flux_total, flux.av > 0 & flux.av < 5 & location_mct2 %in% c("MCT2-1","MCT2-3"))) +
   aes(x=datetime, y=flux.av) +
   geom_point(size=2) +  geom_smooth(size=2) +
   ylab("Surface CO2 flux") +
-  facet_wrap(~Location) +
+  ylim(0.1,4) +
+  facet_wrap(~location_mct2) +
   theme_bw() +
   theme(axis.text = element_text(size = 20),
         axis.text.x = element_blank(),
@@ -491,10 +654,63 @@ p4 <- ggplot(subset(flux_total, Location %in% c("MCT2-1","MCT2-3"))) +
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank(),
         strip.text = element_blank()) +
-  xlim(lims)
+  xlim(lims_2018)
+
+p4.2 <- ggplot(subset(flux_total, flux.av > 0 & flux.av < 5 & location_mct2 %in% c("MCT2-3"))) +
+  aes(x=datetime, y=flux.av) +
+  geom_point(size=2) +  geom_smooth(size=2) +
+  ylab("Surface CO2 flux") +
+  ylim(0.1,4) +
+  facet_wrap(~location_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims_2018)
+
+# flux 2019
+p4b <- ggplot(subset(flux_total2019, flux.av > 0 & flux.av < 7 & location_mct2 %in% c("MCT2-1","MCT2-3"))) +
+  aes(x=datetime, y=flux.av) +
+  geom_point(size=2) +  geom_smooth(size=2) +
+  ylab("Surface CO2 flux") +
+  ylim(0.1,4) +
+  facet_wrap(~location_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims_2019)
+
+p4b.2 <- ggplot(subset(flux_total2019, flux.av > 0 & flux.av < 7 & location_mct2 %in% c("MCT2-3"))) +
+  aes(x=datetime, y=flux.av) +
+  geom_point(size=2) +  geom_smooth(size=2) +
+  ylab("Surface CO2 flux") +
+  ylim(0.1,4) +
+  facet_wrap(~location_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        strip.text = element_blank()) +
+  xlim(lims_2019)
 
 
-p5 <- ggplot(subset(rhiz_toc_av, position_mct2 %in% c(1,3) & depth_class %in% c("30-40", "60-80", "80-100"))) +
+# NPOC 2018
+p5 <- ggplot(subset(rhiz_toc_av, TOC_mm_mean < 9 & position_mct2 %in% c(1,3) & depth_class %in% c("30-40", "60-80", "80-100"))) +
   aes(x=as.POSIXct(date), y=TOC_mm_mean, color=depth_class) +
   geom_point(size=2) + geom_line(size=1) +
   ylab("NPOC (mM)") +
@@ -502,15 +718,35 @@ p5 <- ggplot(subset(rhiz_toc_av, position_mct2 %in% c(1,3) & depth_class %in% c(
   facet_wrap(~position_mct2) +
   theme_bw() +
   theme(axis.text = element_text(size = 20),
-        #axis.text.x = element_blank(),
         axis.title = element_text(size = 20),
         #strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.title.x=element_blank(),
         legend.position = "none",
-        strip.text = element_blank()) +
-  xlim(lims) +
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2018) +
+  scale_color_manual(values=cbPalette)
+
+# NPOC 2019 (empty for now)
+p5b <- ggplot(subset(rhiz_toc_av, TOC_mm_mean < 9 & position_mct2 %in% c(1,3) & depth_class %in% c("30-40", "60-80", "80-100"))) +
+  aes(x=as.POSIXct(date), y=TOC_mm_mean, color=depth_class) +
+  geom_point(size=2) + geom_line(size=1) +
+  ylab("NPOC (mM)") +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2019) +
   scale_color_manual(values=cbPalette)
 
 
@@ -593,6 +829,70 @@ p9 <- ggplot(subset(rhiz_icp_av, position_mct2 %in% c(1,3) & depth_class %in% c(
         strip.text = element_blank()) +
   xlim(lims) +
   scale_color_manual(values=cbPalette)
+
+
+
+# Stack the 2018 moisture & redox
+g2 <- ggplotGrob(p2)
+g3 <- ggplotGrob(p3)
+g <- rbind(g2, g3, size="first")
+g$widths <- unit.pmax(g2$widths, g3$widths)
+grid.newpage()
+grid.draw(g)
+g <- arrangeGrob(g) #generates g
+ggsave(file="moisture_redox2018.pdf", g, width = 5, height = 5, units = "in")
+
+
+# Stack the 2019 moisture & redox
+g2b <- ggplotGrob(p2b)
+g3b <- ggplotGrob(p3b)
+gb <- rbind(g2b, g3b, size="first")
+gb$widths <- unit.pmax(g2b$widths, g3b$widths)
+grid.newpage()
+grid.draw(gb)
+gb <- arrangeGrob(gb) #generates g
+ggsave(file="moisture_redox2019.pdf", gb, width = 5, height = 5, units = "in")
+
+# Stack the 2018 CO2 flux & DOC
+g4 <- ggplotGrob(p4)
+g5 <- ggplotGrob(p5)
+gflux <- rbind(g4, g5, size="first")
+gflux$widths <- unit.pmax(g4$widths, g5$widths)
+grid.newpage()
+grid.draw(gflux)
+gflux <- arrangeGrob(gflux) #generates g
+ggsave(file="flux_doc2018.pdf", gflux, width = 5, height = 5, units = "in")
+
+# Stack the 2019 CO2 flux & DOC
+g4b <- ggplotGrob(p4b)
+g5b <- ggplotGrob(p5b)
+gfluxb <- rbind(g4b, g5b, size="first")
+gfluxb$widths <- unit.pmax(g4b$widths, g5b$widths)
+grid.newpage()
+grid.draw(gfluxb)
+gfluxb <- arrangeGrob(gfluxb) #generates g
+ggsave(file="flux_doc2019.pdf", gfluxb, width = 5, height = 5, units = "in")
+
+# Stack the 2018 redox & flux
+g3.2 <- ggplotGrob(p3.2)
+g4.2 <- ggplotGrob(p4.2)
+gflux <- rbind(g4.2, g3.2, size="first")
+gflux$widths <- unit.pmax(g3.2$widths, g4.2$widths)
+grid.newpage()
+grid.draw(gflux)
+gflux <- arrangeGrob(gflux) #generates g
+ggsave(file="redox_flux_2018.pdf", gflux, width = 3, height = 5, units = "in")
+
+# Stack the 2019 redox & flux
+g3b.2 <- ggplotGrob(p3b.2)
+g4b.2 <- ggplotGrob(p4b.2)
+gfluxb <- rbind(g4b.2, g3b.2, size="first")
+gfluxb$widths <- unit.pmax(g3b.2$widths, g4b.2$widths)
+grid.newpage()
+grid.draw(gfluxb)
+gfluxb <- arrangeGrob(gfluxb) #generates g
+ggsave(file="redox_flux_2019.pdf", gfluxb, width = 3, height = 5, units = "in")
+
 
 # Stack the plots (wtd, moisture, redox, flux, moisture/wtd, NPOC)
 g1 <- ggplotGrob(p1)

@@ -18,14 +18,27 @@ library(zoo)
 setwd("~/east-river/")
 ```
 
+## LOI on June 2017 samples (run Aug 2019)
+```{r}
+loi <- read_excel("Data/loi/june_2017_east_river_loi.xlsx")
+
+loi$soil_g <- as.numeric(loi$soil_g)
+
+loi$om_percent <- ((loi$soil_g - (loi$baked_soil_cruc_g - loi$crucible_g)) / loi$soil_g) * 100
+
+colnames(loi)
+loi_short <- loi[, c(2,9,10)]
+
+```
+
 ## Load total CN data, sample descriptors, column names
 ```{r}
 #er_bulk <- read.table("Data/EA_Data/CA_ER_bulk_6Nov2017.txt", sep="\t") #out of order, corrected below
-er_heavy <- read.table("Data/EA_Data/CA_ER_heavy_7Nov2017.txt", sep="\t")
-er_bulk_ed <- read_excel("Data/EA_Data/CA_ER_bulk_6Nov2017_corrected.xlsx")[,-(1:4)]
-er_int <- read.table("Data/EA_Data/CA_ER_int_10Nov2017.txt", sep="\t")
+er_heavy <- read.table("Data/EA_Data/raw/CA_ER_heavy_7Nov2017.txt", sep="\t")
+er_bulk_ed <- read_excel("Data/EA_Data/raw/CA_ER_bulk_6Nov2017_corrected.xlsx")[,-(1:4)]
+er_int <- read.table("Data/EA_Data/raw/CA_ER_int_10Nov2017.txt", sep="\t")
 
-er_redo <- read.table("Data/EA_Data/CA_180920.txt", sep="\t")[-c(1:7, 16),] #Mariela re-ran these samples Sept 2018; removing all rows except samples
+er_redo <- read.table("Data/EA_Data/raw/CA_180920.txt", sep="\t")[-c(1:7, 16),] #Mariela re-ran these samples Sept 2018; removing all rows except samples
 
 # Adding column names
 colnames(er_heavy) <- c("full_name", "instrument_name", "sample", "sample_id", "sample_amt", 
@@ -124,6 +137,10 @@ er_totalC_av <- er_totalC_total %>%
   group_by(ID, fraction, composite) %>%
   summarize(C_mean_wt_percent = mean(C_wt_pct), N_mean_wt_percent = mean(N_wt_pct), C_sd = sd(C_wt_pct), N_sd = sd(N_wt_pct))
 
+# Merge with LOI data (bulk samples from June 2017, measured Aug 2019)
+er_totalC_av_loi <- merge(er_totalC_av, loi_short, all.x=TRUE)
+
+
 # Read in sample key
 sample_key <- read.csv("Data/June2017_EastRiver_samplekey.csv")
 
@@ -147,7 +164,7 @@ sample_key$btm_cm <- as.numeric(sample_key$btm_cm)
 #sample_key <- sample_key[order(sample_key$location, sample_key$rep), ]
 
 # Merge the total CN data with the sample key, using the common column "ID".
-total_er_cn <- merge(sample_key, er_totalC_av, by="ID", all.y=TRUE)
+total_er_cn <- merge(sample_key, er_totalC_av_loi, by="ID", all.y=TRUE)
 
 # Add date-year column
 total_er_cn$date <- "june_2017"
@@ -179,7 +196,7 @@ total_er_cn_noNA <- left_join(total_er_cn, int_comp, by="ID") %>%
   mutate(location = coalesce(location.x, location.y)) %>%
   mutate(top_cm = coalesce(top_cm.x, btm_cm.y)) %>%
   mutate(btm_cm = coalesce(btm_cm.x, btm_cm.y)) %>%
-  select(ID, location, rep, top_cm, btm_cm, fraction, composite, date, C_mean_wt_percent, N_mean_wt_percent, C_sd, N_sd)
+  select(ID, location, rep, top_cm, btm_cm, fraction, composite, date, C_mean_wt_percent, N_mean_wt_percent, C_sd, N_sd, om_percent)
 
 # Order the columns
 total_er_cn_noNA <- total_er_cn_noNA[order(total_er_cn_noNA$composite, total_er_cn_noNA$fraction, total_er_cn_noNA$location), ]
@@ -236,8 +253,22 @@ ggplot(total_er_cn_dens_frac) +
 total_er_cn_dens_frac <- total_er_cn_dens_frac[order(total_er_cn_dens_frac$location, total_er_cn_dens_frac$fraction, total_er_cn_dens_frac$composite), ]
 
 #Export as csv
-write.csv(total_er_cn_noNA, "Data/EA_data/EA_bulk_dens-fractions_mass-frac_2017_processed.csv")
+#write.csv(total_er_cn_noNA, "Data/EA_data/EA_bulk_dens-fractions_mass-frac_2017_processed.csv")
 
+
+```
+
+## Figures
+```{r}
+ggplot(total_loi) +
+  aes(x=top_cm, y=om_percent, color=location) +
+  geom_point(size=5) +
+  theme_bw()
+
+ggplot(total_er_cn_noNA) +
+  aes(x=C_mean_wt_percent, y=om_percent, color=location) +
+  geom_point(size=5) + geom_smooth(method="lm") +
+  theme_bw()
 
 ```
 

@@ -23,7 +23,7 @@ library(ggsci)
 setwd("~/east-river/")
 ```
 
-## Load and tidy FT-ICR-MS data
+## Load and tidy FT-ICR-MS data (2017 samples)
 ```{r}
 # Rachelle processed FT-ICR-MS data; see email for her R scripts.
 #It gives you the abundance of peaks that can be assigned to different compound classes (lipids, carbs, …) and a few other metrics (S, N or P containing compounds, molecular weight, etc)
@@ -427,5 +427,12 @@ e2
 
 #Plot together with shared legend
 ggarrange(e1, e2, ncol=1, nrow=2, common.legend = TRUE, legend="right")
+
+```
+
+
+## 2018 Samples (rhizons)
+```{r}
+# Load data
 
 ```

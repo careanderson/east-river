@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Load necessary packages
 library(tidyverse)
 library(readxl)
+library(lubridate)
 # Set working directory
 setwd("~/east-river/")
 ```
@@ -93,6 +94,11 @@ rhiz_toc_av <- rhiz_toc %>%
   summarize(TOC_mean = mean(c_ppm, na.rm=TRUE), TOC_mm_mean = mean(c_mm, na.rm=TRUE)) %>%
   mutate(date = make_date(year, month, day))
 
+rhiz_toc_weighted_mean <- rhiz_toc %>%
+  group_by(year, month, day, position_mct2, depth_class) %>%
+  #summarize(TOC_mean = mean(c_ppm, na.rm=TRUE), TOC_mm_mean = mean(c_mm, na.rm=TRUE)) %>%
+  mutate(weighted.value = weighted.mean(c_mm, weights = importance))
+
 ```
 
 ## TOC concentrations and rhizon key for FT-ICR-MS submitted samples
@@ -103,6 +109,52 @@ colnames(icr_submitted) <- "id_r"
 
 # Merge with TOC numbers
 icr_submitted_toc <- merge(icr_submitted, rhiz_toc, all.x = TRUE)
+
+# Write file for Will/EMSL
+#write.csv(icr_submitted_toc, file = "summer2018_rhizons_emsl_toc.csv")
+
+```
+
+## Rhizons 2018 metadata for Will (samples sent Feb 2019, run April 2019)
+```{r}
+rhiz2018 <- read_excel("Sample_lists/SampleSubmissionForm_50285-Fendorf-ICR-Patricia-sample-list.xlsx")[c(1:68), 1]
+colnames(rhiz2018)[1] <- "id_r"
+
+# Need: id_rhizon, position_mct2, depth, date
+
+# Merge with key
+# Match with rhizon key
+rhizon_key <- read_excel("Data/Summer2018_EastRiver_rhizonkey.xlsx")
+
+rhiz2018_merge <- merge(rhiz2018, rhizon_key, by="id_r")
+
+## Match depths
+unique(rhiz2018_merge$depth)
+
+# Change "0-10" to "surf
+rhiz2018_merge$depth[rhiz2018_merge$depth == "0-10"] <- "surf" 
+
+# Change "34-44" to "30-40" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhiz2018_merge$depth[rhiz2018_merge$depth == "34-44"] <- "30-40"
+
+# Change "35-45" to "30-40" for MCT2-1, env rw, 6/1/2018 & 6/10/2018
+rhiz2018_merge$depth[rhiz2018_merge$depth == "35-45"] <- "30-40"
+
+# Change "63-73" to "60-70" for MCT2-4, env 2, 6/1/2018 & 6/10/2018
+rhiz2018_merge$depth[rhiz2018_merge$depth == "63-73"] <- "60-70"
+
+# Change "65-75" to "60-70" for MCT2-4, env 1, 6/1/2018 & 6/10/2018
+rhiz2018_merge$depth[rhiz2018_merge$depth == "65-75"] <- "60-70"
+
+# Remove some columns to match 2019 rhizon submission
+# 2019 rhizon submission: 2019-11-13_rhizon2019_icr_emsl_subsetted.xlsx
+colnames(rhiz2018_merge)
+colnames(rhiz2018_merge)[1] <- "id_rhizon"
+rhiz2018_merge <- rhiz2018_merge[,c(1,2,4,5)]
+
+# Write file for Will/EMSL
+write.csv(rhiz2018_merge, file = "2019-12-08_rhizon2018_icr_emsl_metadata.csv")
+
 
 ```
 

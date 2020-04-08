@@ -20,9 +20,9 @@ setwd("~/east-river/")
 
 ## Load and tidy Acclima logger files
 ```{r}
-mc4 <- read.csv("Data/acclima_raw/DataSnapExport_090820181200_datasnap3_mc4.csv")
-mc3 <- read.csv("Data/acclima_raw/DataSnapExport_090820181246_datasnap1_mc3.csv")
-mc1 <- read.csv("Data/acclima_raw/DataSnapExport_090820181012_datasnap2_mc1.csv")
+mc4 <- read.csv("Data/acclima_raw/DataSnapExport_260920191115_datasnap3_mc4.csv")
+mc3 <- read.csv("Data/acclima_raw/DataSnapExport_260920191112_datasnap1_mc3.csv")
+mc1 <- read.csv("Data/acclima_raw/DataSnapExport_260920191103_datasnap2_mc1.csv")
 
 # change column names
 colnames(mc4) <- c("time", "sensor", "name", "moisture", "temperature", "permittivity", "conductivity", "ec", "datasnap")
@@ -80,7 +80,14 @@ acclima_av <- acclima_total %>%
 
 ## Plots (moisture/temp)
 ```{r}
-ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
+soil_sampling2019 <- c("2019-06-04 00:00:00", "2019-06-15 00:00:00", "2019-07-12 00:00:00", "2019-07-22 00:00:00")
+soil_sampling2019 <- as.POSIXct(soil_sampling2019)
+soil_sampling2019 <- data.frame(soil_sampling2019)
+
+soil_sampling <- merge(discharge, soil_sampling)
+
+
+ggplot(acclima_total[which(acclima_total$time > "2019-05-20 12:00:00"), ]) +
   aes(x=time, y=temperature, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature") +
@@ -92,20 +99,70 @@ ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
   facet_wrap(~location) +
   guides(color=guide_legend(title="Sensor depth (cm)"))
 
-ggplot(acclima_total[which(acclima_total$time > "2018-05-26 12:00:00"), ]) +
+
+lims_2018 <- as.POSIXct(strptime(c("2018-06-02 00:00:00", "2018-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+lims_2019 <- as.POSIXct(strptime(c("2019-06-02 00:00:00", "2019-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+
+# Name transect positions 1, 3, 4
+position_names <- c(
+                    "MCT2-1" = "1",
+                    "MCT2-3" = "3",
+                    "MCT2-4" = "4"
+                    )
+
+# Colorblind palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+
+
+# 2018 moisture
+ggplot(subset(acclima_total, location %in% c("MCT2-1", "MCT2-3"))) +
   aes(x=time, y=moisture, color=depth_cm) +
   geom_point(size = 1) +
-  xlab("Time") + ylab("Soil moisture (volumetric)") + #+ ggtitle("Soil moisture") +
+  ylab("Soil moisture (volumetric)") +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
   theme_bw() +
-  theme(axis.text = element_text(size = 15),
+  theme(axis.title.x = element_blank(),
+        strip.text.x = element_blank(),
+        axis.text.y = element_text(size = 15),
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
-  facet_wrap(~location) +
-  guides(color=guide_legend(title="Sensor depth (cm)"))
+  facet_grid(~location) +
+  guides(color=guide_legend(title="Sensor depth (cm)")) +
+  xlim(lims_2018)
 
-ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
+
+# 2019 moisture
+ggplot(subset(acclima_total, location %in% c("MCT2-1", "MCT2-3"))) +
+  aes(x=time, y=moisture, color=depth_cm) +
+  geom_point(size = 1) +
+#  geom_vline(xintercept = as.POSIXct(as.Date(c("2019-06-04 00:00:00", "2019-06-15 00:00:00", "2019-07-12 00:00:00", "2019-07-22 00:00:00"))), linetype=4, color="black") +
+ # geom_vline(aes(xintercept=as.numeric(x[c(13, 24)])), linetype=4, colour="black") +
+  ylab("Soil moisture (volumetric)") +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        strip.text.x = element_blank(),
+        axis.text = element_text(size = 22),
+        axis.title = element_text(size = 22),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  facet_grid(~location) + #formerly (location~.) for vertical stacking
+  guides(color=guide_legend(title="Sensor depth (cm)")) +
+  xlim(lims_2019)
+
+
+
+
+
+
+ggplot(acclima_total[which(acclima_total$time > "2019-05-20 12:00:00"), ]) +
   aes(x=time, y=conductivity, color=depth_cm) +
   geom_point(size = 1) +
   xlab("time") + ylab("conductivity") + ggtitle("Soil conductivity") +
@@ -117,71 +174,4 @@ ggplot(acclima_total[which(acclima_total$time > "2018-05-20 12:00:00"), ]) +
   facet_wrap(~location) +
   guides(color=guide_legend(title="Sensor depth (cm)"))
 
-
-# MC1
-g1 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-1") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-g2 <- ggplot(mc1[which(mc1$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-1") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-# MC3
-g3 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-3") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-g4 <- ggplot(mc3[which(mc3$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-3") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-# MC4
-g5 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=temperature, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("time") + ylab("temperature (C)") + ggtitle("Soil temperature, MCT2-4") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-g6 <- ggplot(mc4[which(mc4$time > "2018-05-01 12:00:00"), ]) +
-  aes(x=time, y=moisture, color=depth_cm) +
-  geom_point(size = 1) +
-  xlab("time") + ylab("moisture") + ggtitle("Soil moisture, MCT2-4") +
-  theme_bw() +
-  theme(axis.text = element_text(size = 15),
-        axis.title = element_text(size = 15),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-# multiple plots together
-grid.arrange(g1, g3, g5, nrow = 3)
-grid.arrange(g2, g4, g6, nrow = 3)
 ```

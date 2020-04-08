@@ -50,6 +50,6 @@ colnames(xrf_select)[2:10] <- c("Fe_percent", "Al_percent", "Ca_percent", "Mg_pe
 
 colnames(xrf_error_select)[2:19] <- c("Fe_percent", "Fe_abs_error", "Al_percent", "Al_abs_error", "Ca_percent", "Ca_abs_error", "Mg_percent", "Mg_abs_error", "Si_percent", "Si_abs_error", "P_percent", "P_abs_error", "Mn_ug-g", "Mn_abs_error", "S_ug-g", "S_abs_error", "Cl_ug-g", "Cl_abs_error")
 
-write.csv(xrf_error_select, "xrf_2017_processed.csv")
+#write.csv(xrf_error_select, "xrf_2017_processed.csv")
 
 ```

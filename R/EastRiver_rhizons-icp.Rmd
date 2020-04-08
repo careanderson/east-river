@@ -122,14 +122,92 @@ ggplot(subset(rhiz_icp)) +
 ```{r}
 merge <- merge(rhiz_icp, rhiz_toc)
 
-ggplot(subset(merge)) + #Fe < 4.677414e-06
-  aes(x=Fe, y=c_ppm, color=depth_class) +
-  geom_point() +
+# Change facet labels for Fe_mmol_g, fraction_fe2, C_mmol_g
+position.labs <- c("MCT2-1", "MCT2-3")
+names(position.labs) <- c(1, 3)
+
+# Group early & late season (first 3 dates = "early", last 3 dates = "late")
+merge$season_id <- ifelse(merge$date < "2018-07-01", "early", "late")
+
+f <- ggplot(subset(merge, Fe < 4.677414e-06 & c_mm < 10 & depth_class %in% c("surface", "30-40") & position_mct2 %in% c(1,3))) +
+  aes(x=Fe*1000*1000, y=c_mm, color=depth_class) +
+  geom_point() + geom_smooth(method="lm") +
+  xlab("Fe (uM)") + ylab("NPOC (mM)") +
+  facet_wrap(~position_mct2+season_id, scales="free", labeller = labeller(position_mct2 = position.labs)) +
+  theme_bw() +
+  theme(strip.text.x = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "30-40"), labels = c("5 cm", "30 cm"), values=c("#009E73", "#999999"))
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="porewater_fe_c_2018.pdf", f, width = 5, height = 4, units = "in")
+
+
+# Make sure dates line up; put date on bottom graph; make legends match (same titles, color, etc.)
+lims_2018 <- as.POSIXct(strptime(c("2018-05-26 00:00:00", "2018-10-01 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+# Name transect positions 1, 3, 4
+position_names <- c(
+                    "MCT2-1" = "1",
+                    "MCT2-3" = "3",
+                    "MCT2-4" = "4"
+                    )
+
+# Colorblind palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+# Pore water NPOC 2018
+f <- ggplot(subset(rhiz_toc_weighted_mean, weighted.value < 8 & position_mct2 %in% c(1,3) & depth_class %in% c("surface", "30-40", "60-80", "80-100"))) +
+  aes(x=as.POSIXct(date), y=weighted.value, color=depth_class) +
+  geom_point(size=2) + geom_line(size=1) +
+  ylab("NPOC (mM)") +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
   facet_wrap(~position_mct2) +
   theme_bw() +
   theme(axis.text = element_text(size = 20),
         axis.title = element_text(size = 20),
-        strip.text.x = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2018) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "30-40", "60-80", "80-100"), labels = c("5 cm", "30 cm", "70 cm", "100 cm"), values=c("#009E73", "#999999", "#E69F00", "#56B4E9"))
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="porewater_npoc_2018.pdf", f, width = 6, height = 3, units = "in")
+
+
+# Pore water Fe 2018
+f <- ggplot(subset(merge, Fe < 4.677414e-06 & c_mm < 10 & position_mct2 %in% c(1,3))) +
+  aes(x=date, y=Fe*1000*1000, color=depth_class) +
+  geom_point(size=2) + geom_line(size=1) +
+  ylab("Fe (uM)") +
+  guides(color=guide_legend(title="Soil depth (cm)")) +
+  facet_wrap(~position_mct2) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 20),
+        axis.title = element_text(size = 20),
+        #strip.text.x = element_text(size = 12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.title.x=element_blank(),
+        legend.position = "none",
+        strip.text = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  xlim(lims_2018) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "30-40", "60-80", "80-100"), labels = c("5 cm", "30 cm", "70 cm", "100 cm"), values=c("#009E73", "#999999", "#E69F00", "#56B4E9"))
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="porewater_fe_2018.pdf", f, width = 6, height = 3, units = "in")
+
+
 ```

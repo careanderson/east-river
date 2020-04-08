@@ -12,8 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # Load necessary packages
 library(tidyverse)
 library(readxl)
-# Set working directory
-setwd("~/east-river/")
+library(gridExtra)
+library(scales)
 ```
 
 ## TOTAL ORGANIC CARBON
@@ -230,5 +230,427 @@ ggplot(toc_tn_mp) +
   aes(x=c_ppm, y=n_ppm) +
   geom_point() +
   facet_wrap(~extraction, scales="free")
+
+```
+
+## TOC on 2018 East River sequential extractions (performed Fall 2019)
+```{r}
+toc_2018_1 <- read.table("Data/TOC/2019_11_19_001_EastRiver_hamine2x_cga.txt", skip=11, fill=TRUE)[ , c(3,5)]
+toc_2018_2 <- read.table("Data/TOC/2019_11_20_001_EastRiver_hamine2x_cga_RUN.txt", skip=11, fill=TRUE)[ , c(3,5)]
+toc_2018_3 <- read.table("Data/TOC/2019_11_21_001_hamine2x_cga.txt", skip=11, fill=TRUE)[, c(3,5)]
+toc_2018_4 <- read.table("Data/TOC/2019_12_20_001_dith2x_cga.txt", skip=11, fill=TRUE)[, c(3,5)]
+toc_2018_5 <- read.table("Data/TOC/2019_12_21_001_dith2x_cga.txt", skip=11, fill=TRUE)[, c(3,5)]
+
+# Label columns
+colnames(toc_2018_1) <- c("sample","c_ppm")
+colnames(toc_2018_2) <- c("sample","c_ppm")
+colnames(toc_2018_3) <- c("sample","c_ppm")
+colnames(toc_2018_4) <- c("sample","c_ppm")
+colnames(toc_2018_5) <- c("sample","c_ppm")
+
+
+# Row-bind the TOC files
+toc2018 <- rbind(toc_2018_1, toc_2018_2, toc_2018_3, toc_2018_4, toc_2018_5)
+
+# If blanks and standard checks look ok, take them out
+toc2018_samples <- toc2018[grep("x", toc2018$sample), ]
+toc2018_samples$c_ppm <- as.numeric(toc2018_samples$c_ppm)
+
+# Separate the sample column
+toc2018_samples <- toc2018_samples %>%
+  separate(sample, c("extraction", "dilution_toc", "id"), "_")
+toc2018_samples <- toc2018_samples[,c(1,3,4)]
+toc2018_samples$id <- as.numeric(toc2018_samples$id)
+
+```
+
+## Merge with MP-ICP-AES data and ferrozine data
+```{r}
+# In future, load processed scripts (for now run both TOC & MP-ICP-AES scripts to get dataframes)
+
+toc_mp_2018 <- merge(toc2018_samples, mp_total2018, by=c("id", "extraction"))
+
+# and merged with ferrozine data (need to figure out why so many data points are)
+toc_mp_2018 <- merge(toc_mp_2018, ferro_wide_short)
+
+```
+
+## Correct TOC data
+```{r}
+
+# 10x dilution for pyrophosphate, 2x dilution for all others
+#Need to report C in mol C g-1 soil, so you will want to multiply the initial value (mg L-1) by (volume of extractant in L/mass of soil in g). The resulting number is then divided by 12 mg mmol-1 (or g mol-1).
+toc_mp_2018$mmol_c_g[toc_mp_2018$extraction=="pp"] <- 
+  (toc_mp_2018$c_ppm[toc_mp_2018$extraction=="pp"] * 10) * (0.03/1) * (1/12)
+
+toc_mp_2018$mmol_c_g[toc_mp_2018$extraction=="dith"] <- 
+  (toc_mp_2018$c_ppm[toc_mp_2018$extraction=="dith"] * 2) * (0.03/1) * (1/12)
+
+toc_mp_2018$mmol_c_g[toc_mp_2018$extraction=="ham"] <- 
+  (toc_mp_2018$c_ppm[toc_mp_2018$extraction=="ham"] * 2) * (0.03/1) * (1/12)
+
+toc_mp_2018$mmol_c_g[toc_mp_2018$extraction=="h2o"] <- 
+  (toc_mp_2018$c_ppm[toc_mp_2018$extraction=="h2o"] * 2) * (0.03/1) * (1/12)
+
+toc_mp_2018$extraction <- factor(toc_mp_2018$extraction, levels = c("dith", "ham", "pp", "h2o"))
+toc_mp_2018$depth_category <- factor(toc_mp_2018$depth_category, levels = unique(toc_mp_2018$depth_category))
+toc_mp_2018$extraction2 <- factor(toc_mp_2018$extraction, levels = c("h2o", "pp", "ham", "dith"))
+
+levels(toc_mp_2018$extraction2) <- c("Water", "Pyrophosphate", "H-amine", "Dithionite")
+
+# Group early & late season (first 3 dates = "early", last 3 dates = "late")
+toc_mp_2018$season_id <- ifelse(toc_mp_2018$date < "2018-07-01", "early", "late")
+
+```
+
+## TOC & metal figures
+```{r}
+# TOC figures (amount per depth across transect)
+ggplot(subset(toc_mp_2018, element %in% "Fe" & depth_category %in% c("shallow", "subsurface"))) +
+  aes(x=depth_category, y=mmol_c_g, fill=extraction) +
+  geom_bar(stat="identity") +
+  coord_flip() +
+  xlab("") + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 30),
+        axis.title = element_text(size = 35),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.y = element_text(size = 35),
+        legend.title=element_text(size=27),
+        legend.text=element_text(size=27),
+        legend.position = 'top', 
+        legend.spacing = unit(16, 'pt')) +
+  scale_fill_manual(name="", breaks = c("h2o", "pp", "ham", "dith"), labels = c("Water", "Pyrophosphate", "H-amine", "Dithionite"), values=rev(c("#0072B2", "#F0E442", "#000000", "#009E73"))) +
+  facet_grid(location~.)
+
+# TOC over time, by extraction
+ggplot(subset(toc_mp_2018, element %in% "Fe")) +
+  aes(x=date, y=mmol_c_g, color=depth_category2) +
+  geom_point() +
+  facet_wrap(~extraction+location)
+
+# TOC by depth
+ggplot(subset(toc_mp_2018, element %in% "Fe")) +
+  aes(x=top_cm, y=mmol_c_g) +
+  geom_point() +
+  facet_wrap(~extraction, scales="free") +
+  xlab("soil depth (cm)") + ylab("TOC (mmol C g-1)")
+
+# TOC vs. metals
+ggplot(subset(toc_mp_2018, element %in% "Fe")) +
+  aes(x=conc_corrected_mmol_g, y=mmol_c_g) +
+  geom_point(aes(color=depth_category2)) + geom_smooth(method="lm") +
+  facet_wrap(~extraction2+date) +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  labs(color= "Depth") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=10),
+        legend.key.size = unit(3,"point")) +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=1)))
+
+ggplot(subset(toc_mp_2018, element %in% "Fe")) +
+  aes(x=conc_corrected_mmol_g, y=mmol_c_g) +
+  geom_point(aes(color=depth_category2)) + geom_smooth(method="lm") +
+  facet_wrap(~extraction2+location) +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  labs(color= "Depth") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=10),
+        legend.key.size = unit(3,"point")) +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=1)))
+
+ggplot(subset(toc_mp_2018, element %in% "Fe" & depth_category %in% "shallow")) +
+  aes(x=conc_corrected_mmol_g, y=mmol_c_g, color=location) +
+  geom_point() + geom_smooth(method="lm") +
+  facet_grid(~extraction2+season_id, scales="free") +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  labs(color= "Depth") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=10),
+        legend.key.size = unit(3,"point")) +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=1)))
+
+ggplot(subset(toc_mp_2018, element %in% "Fe" & depth_category %in% c("subsurface", "deep"))) +
+  aes(x=conc_corrected_mmol_g, y=mmol_c_g, color=location) +
+  geom_point() + geom_smooth(method="lm") +
+  facet_grid(~extraction2+season_id, scales="free") +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  labs(color= "Depth") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=10),
+        legend.key.size = unit(3,"point")) +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=1)))
+
+ggplot(subset(toc_mp_2018, element %in% "Fe" & depth_category %in% c("shallow"))) +
+  aes(x=conc_corrected_mmol_g, y=mmol_c_g) +
+  geom_point(aes(color=location)) + geom_smooth(method="lm") +
+  facet_wrap(~extraction2+date) +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  labs(color= "Location") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.text.x = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=10),
+        legend.key.size = unit(3,"point")) +
+  scale_size_continuous(guide=FALSE) +
+  guides(color = guide_legend(override.aes = list(size=1)))
+```
+
+## Figures for AGU 2019
+```{r}
+# Melt
+colnames(toc_mp_2018)
+# when not merging with ferrzone:
+#toc_mp_2018_short <- toc_mp_2018[,c(1,2,5,8,9,11,12,13,15:20)]
+
+# when merging with ferrozine:
+toc_mp_2018_short <- toc_mp_2018[,c(1,2,4,6:19)]
+colnames(toc_mp_2018_short)
+
+tocmp_melt2018 <- melt(toc_mp_2018_short, id=c("id", "date", "location", "extraction", "element", "top_cm", "btm_cm", "depth_category", "depth_category2", "extraction2", "season_id"))
+
+tocmp_melt2018$extraction <- factor(tocmp_melt2018$extraction, levels = c("dith", "ham", "pp", "h2o"))
+tocmp_melt2018$depth_category <- factor(tocmp_melt2018$depth_category, levels = unique(tocmp_melt2018$depth_category))
+tocmp_melt2018$depth_category2 <- factor(tocmp_melt2018$depth_category2, levels = unique(tocmp_melt2018$depth_category2))
+tocmp_melt2018$location <- factor(tocmp_melt2018$location)
+tocmp_melt2018$date <- as.Date(tocmp_melt2018$date, format="%m/%d/%Y")
+
+
+# Change facet labels for Fe_mmol_g, fraction_fe2, C_mmol_g
+extraction.labs <- c("Fe (mmol / g)", "C (mmol / g)", "Fe(II) / total Fe")
+names(extraction.labs) <- c("conc_corrected_mmol_g", "mmol_c_g", "fraction_fe2_per_fe_total")
+
+# Change order of facets
+tocmp_melt2018$variable <- factor(tocmp_melt2018$variable,
+                                  levels=c("conc_corrected_mmol_g","mmol_c_g","fraction_fe2_per_fe_total"))
+
+# Change depth_category2 into actual numbers
+depth.labs <- c("5-15", "30-40", "70-80", "100-110")
+names(depth.labs) <- c("surface", "shallow", "subsurface", "deep")
+
+# Calc weighted mean
+colnames(tocmp_melt2018)
+tocmp_melt2018_weighted <- tocmp_melt2018 %>% 
+  group_by(date, location, extraction, element, depth_category2, season_id, variable) %>%
+  mutate(weighted.value = weighted.mean(value, weights = importance))
+
+# Colorblind palettes
+# The palette with grey:
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+# The palette with black:
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# C & total Fe over time (weighted averages)
+f <- ggplot(subset(tocmp_melt2018_weighted, element %in% "Fe" & variable %in% c("conc_corrected_mmol_g", "mmol_c_g"))) +
+  aes(x=date, y=weighted.value, color=depth_category2) +
+  geom_point() + geom_line() +
+  facet_wrap(~location+variable, scales = "free", labeller = labeller(variable = extraction.labs)) +
+#  labs(color= "Soil depth (cm)") +
+  theme_bw() +
+  theme(strip.text.x = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        axis.title = element_blank(),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "shallow", "subsurface", "deep"), labels = c("5 cm", "30 cm", "70 cm", "100 cm"), values=c("#009E73", "#999999", "#E69F00", "#56B4E9"))
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="c_fe_weighted_2018.pdf", f, width = 7, height = 6, units = "in")
+
+
+# C over time (weighted averages)
+f <- ggplot(subset(tocmp_melt2018_weighted, element %in% "Fe" & variable %in% c("mmol_c_g"))) +
+  aes(x=date, y=weighted.value, color=depth_category2) +
+  geom_point() + geom_line() +
+  facet_grid(rows = vars(location), scales = "free") +
+  theme_bw() +
+  theme(strip.text.y = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_blank(),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "shallow", "subsurface", "deep"), labels = c("5 cm", "30 cm", "70 cm", "100 cm"), values=c("#009E73", "#999999", "#E69F00", "#56B4E9"))
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="c_weighted_2018.pdf", f, width = 3, height = 3, units = "in")
+
+# Fe over time (weighted averages)
+f <- ggplot(subset(tocmp_melt2018_weighted, element %in% "Fe" & variable %in% c("conc_corrected_mmol_g"))) +
+  aes(x=date, y=weighted.value, color=depth_category2) +
+  geom_point() + geom_line() +
+  facet_grid(rows = vars(location), scales = "free") +
+  theme_bw() +
+  theme(strip.text.y = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_blank(),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "shallow", "subsurface", "deep"), labels = c("5 cm", "30 cm", "70 cm", "100 cm"), values=c("#009E73", "#999999", "#E69F00", "#56B4E9"))
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="fe_weighted_2018.pdf", f, width = 3, height = 3, units = "in")
+
+
+
+
+# C & total Fe & Fe(II) over time (weighted averages)
+f <- ggplot(subset(tocmp_melt2018_weighted, element %in% "Fe" & variable %in% c("conc_corrected_mmol_g", "mmol_c_g", "fraction_fe2_per_fe_total"))) +
+  aes(x=date, y=weighted.value, color=depth_category2) +
+  geom_point() + geom_line() +
+  facet_wrap(~location+variable, scales = "free", labeller = labeller(variable = extraction.labs)) +
+  labs(color= "Soil depth") +
+  theme_bw() +
+  theme(strip.text.x = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        axis.title = element_blank(),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="c_fe_fe2_weighted_2018.pdf", f, width = 10, height = 6, units = "in")
+
+# C & total Fe & Fe(II) over time
+f <- ggplot(subset(tocmp_melt2018, element %in% "Fe" & variable %in% c("conc_corrected_mmol_g", "mmol_c_g", "fraction_fe2_per_fe_total"))) +
+  aes(x=date, y=value, color=depth_category2) +
+  geom_point() + #geom_line() +
+  labs(color= "Soil depth") +
+  theme_bw() +
+  facet_wrap(~location+variable, scales = "free", labeller = labeller(variable = extraction.labs)) +
+  theme(strip.text.x = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        axis.title = element_blank(),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+f <- arrangeGrob(f) #generates f
+ggsave(file="c_fe_fe2_2018.pdf", f, width = 10, height = 6, units = "in")
+
+# C-Fe correlations
+g <- ggplot(subset(toc_mp_2018, element %in% "Fe")) +
+  aes(x=conc_corrected_mmol_g, y=mmol_c_g, color=depth_category2) +
+  geom_point() + geom_smooth(method="lm") +
+  labs(color= "Soil depth") +
+  facet_wrap(~location+season_id, scales = "free") +
+  xlab(expression(Iron~(mmol~g^-1))) + ylab(expression(Organic~Carbon~(mmol~g^-1))) +
+  theme_bw() +
+  scale_x_continuous(breaks = scales::pretty_breaks(3)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(4)) +
+  theme(strip.text.x = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  scale_color_manual(name="Soil depth", breaks = c("surface", "shallow", "subsurface", "deep"), labels = c("5 cm", "30 cm", "70 cm", "100 cm"), values=c("#009E73", "#999999", "#E69F00", "#56B4E9"))
+
+g <- arrangeGrob(g) #generates g
+ggsave(file="c_fe_correlations_2018.pdf", g, width = 5, height = 4, units = "in")
+```
+
+## Stats on 2018 sequential extractions
+```{r}
+# R2 and p-values for TOC vs. Fe correlations (by extraction)
+fe_toc_ham <- subset(toc_mp_2018, element %in% "Fe" & extraction %in% "ham")
+
+fe_toc_ham_surf <- subset(fe_toc_ham, depth_category2 %in% c("surface", "shallow"))
+fe_toc_ham_deep <- subset(fe_toc_ham, depth_category2 %in% c("subsurface", "deep"))
+
+fe_toc_ham_surf_early1 <- subset(fe_toc_ham_surf, season_id %in% "early" & location %in% "MCT2-1")
+fe_toc_ham_surf_late1 <- subset(fe_toc_ham_surf, season_id %in% "late" & location %in% "MCT2-1")
+
+fe_toc_ham_surf_early3 <- subset(fe_toc_ham_surf, season_id %in% "early" & location %in% "MCT2-3")
+fe_toc_ham_surf_late3 <- subset(fe_toc_ham_surf, season_id %in% "late" & location %in% "MCT2-3")
+
+
+fe_toc_ham_deep_early <- subset(fe_toc_ham_deep, season_id %in% "early")
+fe_toc_ham_deep_late <- subset(fe_toc_ham_deep, season_id %in% "late")
+
+
+# fe_toc_ham_surf_early1
+plot(fe_toc_ham_surf_early1$conc_corrected_mmol_g, fe_toc_ham_surf_early1$mmol_c_g)
+fe_toc_ham_surf_early1_model <- lm(mmol_c_g ~ conc_corrected_mmol_g, data=fe_toc_ham_surf_early1)
+abline(fe_toc_ham_surf_early1_model, col = "red")
+summary(fe_toc_ham_surf_early1_model)
+
+# fe_toc_ham_surf_late1
+plot(fe_toc_ham_surf_late1$conc_corrected_mmol_g, fe_toc_ham_surf_late1$mmol_c_g)
+fe_toc_ham_surf_late1_model <- lm(mmol_c_g ~ conc_corrected_mmol_g, data=fe_toc_ham_surf_late1)
+abline(fe_toc_ham_surf_late1_model, col = "red")
+summary(fe_toc_ham_surf_late1_model)
+
+# fe_toc_ham_surf_early3
+plot(fe_toc_ham_surf_early3$conc_corrected_mmol_g, fe_toc_ham_surf_early3$mmol_c_g)
+fe_toc_ham_surf_early3_model <- lm(mmol_c_g ~ conc_corrected_mmol_g, data=fe_toc_ham_surf_early3)
+abline(fe_toc_ham_surf_early3_model, col = "red")
+summary(fe_toc_ham_surf_early3_model)
+
+# fe_toc_ham_surf_late3
+plot(fe_toc_ham_surf_late3$conc_corrected_mmol_g, fe_toc_ham_surf_late3$mmol_c_g)
+fe_toc_ham_surf_late3_model <- lm(mmol_c_g ~ conc_corrected_mmol_g, data=fe_toc_ham_surf_late3)
+abline(fe_toc_ham_surf_late3_model, col = "red")
+summary(fe_toc_ham_surf_late3_model)
+
+
+
+
+
+
+# fe_toc_ham_deep_early
+plot(fe_toc_ham_deep_early$conc_corrected_mmol_g, fe_toc_ham_deep_early$mmol_c_g)
+fe_toc_ham_deep_early_model <- lm(mmol_c_g ~ conc_corrected_mmol_g, data=fe_toc_ham_deep_early)
+abline(fe_toc_ham_deep_early_model, col = "red")
+summary(fe_toc_ham_deep_early_model)
+
+# fe_toc_ham_deep_late
+plot(fe_toc_ham_deep_late$conc_corrected_mmol_g, fe_toc_ham_deep_late$mmol_c_g)
+fe_toc_ham_deep_late_model <- lm(mmol_c_g ~ conc_corrected_mmol_g, data=fe_toc_ham_deep_late)
+abline(fe_toc_ham_deep_late_model, col = "red")
+summary(fe_toc_ham_deep_late_model)
+
 
 ```

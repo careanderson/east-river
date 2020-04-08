@@ -133,7 +133,7 @@ ggplot(soil.sieved, aes(x=log(roots_mg), y=mean.depth_cm, color=location)) +
   xlab("Log(Root biomass (mg))") +
   ylab("Depth (cm)")
 
-# Root biomass (mg roots g-1 soil)
+# Root biomass (g roots g-1 soil)
 ggplot(soil.sieved, aes(x=root_frac, y=mean.depth_cm, color=location)) +
   geom_point() +
 #  geom_smooth(method="lm") +

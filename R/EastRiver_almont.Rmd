@@ -32,6 +32,10 @@ discharge_2 <- read.table("Data/EastRiver_discharge/30Oct2018_east_river_almont_
 discharge_2 <- discharge_2[-1, ] #remove first row
 discharge_2 <- discharge_2[c(8833:20402), ] #need from July 2, 2018 thru last date
 
+# 2019 discharge
+discharge_2019 <- read.table("Data/EastRiver_discharge/2019-10-31_east_river_almont_discharge.txt", sep="\t", header=TRUE)
+discharge_2019 <- discharge_2019[-1, ] #remove first row
+
 # Combine for the whole dataset
 discharge <- rbind(discharge_1, discharge_2)
 
@@ -41,17 +45,26 @@ discharge <- rbind(discharge_1, discharge_2)
 ## Tidy data
 ```{r}
 discharge <- discharge[ , c(3,5,7)] #Only taking date/time, discharge, gage height data
+discharge_2019 <- discharge_2019[ , c(3,5,7)]
 
 colnames(discharge)[c(2,3)] <- c("discharge_cfs", "gageheight_ft") #Rename columns
+colnames(discharge_2019)[c(2,3)] <- c("discharge_cfs", "gageheight_ft") #Rename columns
 
 # Converting date column
 discharge$datetime <- as.POSIXct(discharge$datetime, format = "%Y-%m-%d %H:%M")
 discharge$date <- as.Date(discharge$datetime, "%Y-%m-%d")
 
+discharge_2019$datetime <- as.POSIXct(discharge_2019$datetime, format = "%Y-%m-%d %H:%M")
+discharge_2019$date <- as.Date(discharge_2019$datetime, "%Y-%m-%d")
+
 # Change to numeric
 discharge$discharge_cfs <- as.numeric(as.character(discharge$discharge_cfs))
 discharge$gageheight_ft <- as.numeric(as.character(discharge$gageheight_ft))
 discharge$gageheight_m <- discharge$gageheight_ft * 0.3048
+
+discharge_2019$discharge_cfs <- as.numeric(as.character(discharge_2019$discharge_cfs))
+discharge_2019$gageheight_ft <- as.numeric(as.character(discharge_2019$gageheight_ft))
+discharge_2019$gageheight_m <- discharge_2019$gageheight_ft * 0.3048
 
 ```
 
@@ -65,26 +78,106 @@ soil_sampling <- data.frame(soil_sampling)
 
 soil_sampling <- merge(discharge, soil_sampling)
 
-ggplot(discharge) +
-  geom_line(data=discharge, aes(x=datetime, y=gageheight_ft), color="blue", size=1) +
-  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
-  xlab("Date") + ylab("East River height (feet)") +
+lims_2018 <- as.POSIXct(strptime(c("2018-06-02 00:00:00", "2018-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+lims_2019 <- as.POSIXct(strptime(c("2019-06-02 00:00:00", "2019-10-09 00:00:00"), format = "%Y-%m-%d %H:%M"))
+
+
+g <- ggplot(discharge) +
+  geom_line(data=discharge, aes(x=datetime, y=discharge_cfs), color="blue", size=0.5) +
+#  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red", size = 0.5) +
+  xlab("Date") + ylab("East River discharge (cfs)") +
   theme_bw() +
   theme(axis.text = element_text(size = 15),
         axis.title = element_text(size = 15),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-ggplot(discharge[which(discharge$datetime > "2018-04-15 12:00:00"), ])  +
-  geom_line(aes(x=datetime, y=gageheight_ft), color="blue", size=1) +
+ggsave(file="river2018_soil_sampling.pdf", g, width = 4, height = 3, units = "in")
+
+discharge$year_cat <- as.factor("2018")
+discharge_2019$year_cat <- as.factor("2019")
+
+# for y-axis & title
+discharge_axis <- ggplot(discharge[which(discharge$datetime > "2018-05-01 12:00:00"), ])  +
+  geom_line(aes(x=datetime, y=discharge_cfs), color="blue", size=1) +
 #  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
-  xlab("") + ylab("East River height (ft)") +
-  theme_bw() +
+  xlab("") +
+  ylab("East River discharge (cfs)") +
+  theme_bw() + ylim(0,3000) +
   theme(axis.text = element_text(size = 22),
         axis.title = element_text(size = 22),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
-  scale_x_datetime(date_breaks = "1 month", date_labels = "%B %Y")
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B") #add %Y if you want year displayed
+
+
+p1 <- ggplot(discharge[which(discharge$datetime > "2018-05-01 12:00:00"), ])  +
+  geom_line(aes(x=datetime, y=discharge_cfs), color="blue", size=1) +
+#  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
+  xlab("") +
+  #ylab("East River discharge (cfs)") +
+  theme_bw() + ylim(0,3000) +
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+       # axis.title.y = element_text(size = 22),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(size=15, angle = 45, vjust = 1, hjust=1)) +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B")
+
+p2 <- ggplot(discharge_2019[which(discharge_2019$datetime > "2019-05-01 12:00:00"), ])  +
+  geom_line(aes(x=datetime, y=discharge_cfs), color="blue", size=1) +
+#  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
+  xlab("") +
+  #ylab("East River discharge (cfs)") +
+  theme_bw() + ylim(0,3000) +
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+       # axis.title.y = element_text(size = 22),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(size=15, angle = 45, vjust = 1, hjust=1)) +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%B")
+
+# Put the plots in the same rows (2018 and 2019 discharge)
+discharge_1row <- grid.arrange(p1, p2, nrow = 1)
+g <- arrangeGrob(discharge_1row) #generates g
+ggsave(file="discharge1row.pdf", g, width = 6, height = 3, units = "in")
+
+g2 <- arrangeGrob(discharge_axis)
+ggsave(file="discharge_yaxis.pdf", g2, width = 3, height = 3, units = "in")
+
+
+# Stack the plots (2018 and 2019 discharge)
+g1 <- ggplotGrob(p1)
+g2 <- ggplotGrob(p2)
+g <- rbind(g1, g2, size="first")
+g$widths <- unit.pmax(g1$widths, g2$widths)
+grid.newpage()
+grid.draw(g)
+
+#save
+g <- arrangeGrob(g) #generates g
+ggsave(file="mc-env-final.pdf", g, width = 8, height = 13.75, units = "in") #saves g, h = 11 for 4
+
+# 2018 discharge only for AGU2019 poster
+g <- ggplot(discharge[which(discharge$datetime > "2018-05-01 12:00:00" & discharge$datetime < "2018-10-01 12:00:00"), ])  +
+  geom_line(aes(x=datetime, y=discharge_cfs), color="blue", size=1) +
+#  geom_point(data = soil_sampling, aes(x = soil_sampling, y=gageheight_ft), color = "red") +
+  xlab("") +
+  #ylab("East River discharge (cfs)") +
+  theme_bw() + #ylim(0,3000) +
+  theme(axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+       # axis.title.y = element_text(size = 22),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.x = element_text(size=15, angle = 45, vjust = 1, hjust=1)) +
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%b")
+
+ggsave(file="river2018.pdf", g, width = 4, height = 3, units = "in")
+
 ```
 
